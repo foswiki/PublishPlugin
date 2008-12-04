@@ -22,10 +22,10 @@ use Foswiki::Func;
 use File::Path;
 
 sub new {
-    my( $class, $path, $web ) = @_;
+    my ( $class, $path, $web ) = @_;
     my $this = bless( {}, $class );
     $this->{path} = $path;
-    $this->{web} = $web;
+    $this->{web}  = $web;
 
     eval "use Archive::Tar";
     die $@ if $@;
@@ -35,39 +35,41 @@ sub new {
 }
 
 sub addDirectory {
+
     # Not needed
 }
 
 sub addString {
-    my( $this, $string, $file ) = @_;
-    unless ($this->{tar}->add_data( $file, $string )) {
-        $this->{logger}->logError($this->{tar}->error());
+    my ( $this, $string, $file ) = @_;
+    unless ( $this->{tar}->add_data( $file, $string ) ) {
+        $this->{logger}->logError( $this->{tar}->error() );
     }
 }
 
 sub addFile {
-    my( $this, $from, $to ) = @_;
+    my ( $this, $from, $to ) = @_;
     local $/ = undef;
-    if (open(R, "<$from")) {
+    if ( open( R, "<$from" ) ) {
         $this->addString( <R>, $to );
         close(R);
-    } else {
+    }
+    else {
         $this->{logger}->logError("Failed to open $from: $!");
     }
 }
 
 sub close {
     my $this = shift;
-    my $dir = $this->{path};
-    if ($this->{web} =~ m!^(.*)/.*?$!) {
+    my $dir  = $this->{path};
+    if ( $this->{web} =~ m!^(.*)/.*?$! ) {
         $dir .= $1;
     }
     eval { File::Path::mkpath($dir) };
     $this->{logger}->logError($@) if $@;
     my $landed = "$this->{web}.tgz";
-    unless ($this->{tar}->write( "$this->{path}$landed", 1 )) {
-        $this->{logger}->logError($this->{tar}->error())
-    };
+    unless ( $this->{tar}->write( "$this->{path}$landed", 1 ) ) {
+        $this->{logger}->logError( $this->{tar}->error() );
+    }
     return $landed;
 }
 

@@ -22,10 +22,10 @@ use Foswiki::Func;
 use File::Path;
 
 sub new {
-    my( $class, $path, $web ) = @_;
+    my ( $class, $path, $web ) = @_;
     my $this = bless( {}, $class );
     $this->{path} = $path;
-    $this->{web} = $web;
+    $this->{web}  = $web;
 
     eval "use Archive::Zip qw( :ERROR_CODES :CONSTANTS )";
     die $@ if $@;
@@ -35,34 +35,34 @@ sub new {
 }
 
 sub addDirectory {
-    my( $this, $dir ) = @_;
-    $this->{logger}->logError("Error adding $dir") unless
-      $this->{zip}->addDirectory( $dir );
+    my ( $this, $dir ) = @_;
+    $this->{logger}->logError("Error adding $dir")
+      unless $this->{zip}->addDirectory($dir);
 }
 
 sub addString {
-    my( $this, $string, $file ) = @_;
-    $this->{logger}->logError("Error adding $string") unless
-      $this->{zip}->addString( $string, $file );
+    my ( $this, $string, $file ) = @_;
+    $this->{logger}->logError("Error adding $string")
+      unless $this->{zip}->addString( $string, $file );
 }
 
 sub addFile {
-    my( $this, $from, $to ) = @_;
-    $this->{logger}->logError("Error adding $from") unless
-      $this->{zip}->addFile( $from, $to );
+    my ( $this, $from, $to ) = @_;
+    $this->{logger}->logError("Error adding $from")
+      unless $this->{zip}->addFile( $from, $to );
 }
 
 sub close {
     my $this = shift;
-    my $dir = $this->{path};
-    if ($this->{web} =~ m!^(.*)/.*?$!) {
+    my $dir  = $this->{path};
+    if ( $this->{web} =~ m!^(.*)/.*?$! ) {
         $dir .= $1;
     }
     eval { File::Path::mkpath($dir) };
     $this->{logger}->logError($@) if $@;
     my $landed = "$this->{web}.zip";
-    $this->{logger}->logError("Error writing $landed") if
-      $this->{zip}->writeToFileNamed( "$this->{path}$landed" );
+    $this->{logger}->logError("Error writing $landed")
+      if $this->{zip}->writeToFileNamed("$this->{path}$landed");
     return $landed;
 }
 

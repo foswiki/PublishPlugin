@@ -15,7 +15,7 @@
 
 _Previously known as !GenHTMLAddOn, !PublishAddOn, and !PublishContrib, this is the *original* publishing extension for TWiki<sup>&reg;</sup>_.
 
-Now ported and improved for *Foswiki*!.
+*Now ported and improved for Foswiki*!.
 
 <img src="%ATTACHURLPATH%/publish.gif" style="float:right" />
 !PublishPlugin provides support for the generation of stand-alone HTML from a web. It will generate fully rendered versions of a set of Foswiki pages together with any attached files.
@@ -391,13 +391,13 @@ Note that =htmldoc= can also be used to generate !PostScript by using the =-t= o
    1 Install Archive::Zip and everything it depends on
 
 ---++ Info
-This add-on started as the TWiki:Extensions/GenHTMLAddon, written by Foswiki:Main/CrawfordCurrie at Motorola. It was then partially rewritten by TWiki:Main/EricScouten, and then fixed and enhanced by Foswiki:Main/CrawfordCurrie (http://c-dot.co.uk). It has been further extended by Foswiki:Main/SvenDowideit and Foswiki:Main/MartinCleaver, and most recently refactored for Foswiki by Foswiki:Main/CrawfordCurrie
+This add-on started life as the TWiki:Extensions/GenHTMLAddon, written by Foswiki:Main/CrawfordCurrie at Motorola. It was then extended by TWiki:Main/EricScouten, and then further fixed and enhanced by Foswiki:Main/CrawfordCurrie (http://c-dot.co.uk). It has also been extended by Foswiki:Main/SvenDowideit and Foswiki:Main/MartinCleaver, and most recently refactored for Foswiki by Foswiki:Main/CrawfordCurrie.
 
 |  Authors: | Foswiki:Main/CrawfordCurrie, TWiki:Main/EricScouten, Foswiki:Main.SvenDowideit, Foswiki:Main.MartinCleaver|
 |  Dependencies: | %$DEPENDENCIES% |
 |  Version: | %$VERSION% |
 |  Change History: | |
-|  27 Nov 2008 | Foswikibug:8019: refactoreed as a plugin and tested in Foswiki |
+|  27 Nov 2008 | Foswikibug:8019: refactored as a plugin and tested in Foswiki |
 |  27 Oct 2008 | TWikibug:Item5385: Fixed doc for configtopic TWikibug:Item5388: $WEB and $TOPIC were not correct in %IF statements TWikibug:Item5390: remove comments from .css before processing for included resoures TWikibug:Item5706: Improved FTP upload process for incrementally maintained webs TWikibug:Item6029: expand config topic on load to support use of searches TWikibug:Item6030: respect VIEW_TEMPLATE in published topics TWikibug:Item6092: expand common tags in configtopic TWikibug:Item6094: move sitemap options into base file generator TWikibug:Item6110: rename settings in config topic to avoid clashes with other plugins |
 |  11 Dec 2007 | TWikibug:Item5099 fixed |
 |  10 Nov 2007 | Tested on 4.2.0. TWikibug:Item4624:, TWikibug:Item4625: TWikibug:Item4830: fixed. TWikibug:Item4825: added a basic skin to avoid the confusion caused by =text= skin. TWikibug:Item4951: added interface to allow management of output files |

@@ -10,62 +10,64 @@ use Error qw( :try );
 
 use strict;
 
-use vars qw( $VERSION $RELEASE );
-
-$VERSION = '$Rev: 17708 $';
-
-my $debug = 0;
-
-$RELEASE = 'Foswiki-1';
+our $VERSION = '$Rev: 17708 $';
+our $RELEASE = '04 Dec 2008';
+our $SHORTDESCRIPTION =
+'Generate static output (HTML, PDF) optionally upload (FTP) the output to a publishing site.';
 
 sub initPlugin {
     unless ( defined $Foswiki::cfg{PublishPlugin}{Dir} ) {
         die "{PublishPlugin}{Dir} not defined; run install script";
     }
-    unless( -d $Foswiki::cfg{PublishPlugin}{Dir}) {
-        die "{PublishPlugin}{Dir} $Foswiki::cfg{PublishPlugin}{Dir} does not exist";
+    unless ( -d $Foswiki::cfg{PublishPlugin}{Dir} ) {
+        die
+"{PublishPlugin}{Dir} $Foswiki::cfg{PublishPlugin}{Dir} does not exist";
     }
-    unless ( $Foswiki::cfg{PublishPlugin}{Dir} =~ m!/$!) {
+    unless ( $Foswiki::cfg{PublishPlugin}{Dir} =~ m!/$! ) {
         die "{PublishPlugin}{Dir} must terminate in a slash";
     }
-    unless ($Foswiki::cfg{PublishPlugin}{URL}) {
-        die "Can't publish because {PublishPlugin}{URL} was not set. Please notify your Wiki administrator";
+    unless ( $Foswiki::cfg{PublishPlugin}{URL} ) {
+        die
+"Can't publish because {PublishPlugin}{URL} was not set. Please notify your Wiki administrator";
     }
-    if ( ! -d $Foswiki::cfg{PublishPlugin}{Dir} &&
-           ! -e $Foswiki::cfg{PublishPlugin}{Dir}) {
-        mkdir($Foswiki::cfg{PublishPlugin}{Dir}, 0777) ||
-          die "Cannot mkdir {PublishPlugin}{Dir}";
+    if (   !-d $Foswiki::cfg{PublishPlugin}{Dir}
+        && !-e $Foswiki::cfg{PublishPlugin}{Dir} )
+    {
+        mkdir( $Foswiki::cfg{PublishPlugin}{Dir}, 0777 )
+          || die "Cannot mkdir {PublishPlugin}{Dir}";
     }
-    unless (-d $Foswiki::cfg{PublishPlugin}{Dir} &&
-              -w $Foswiki::cfg{PublishPlugin}{Dir}) {
-        die "Can't publish because no useable {PublishPlugin}{Dir} was found. Please notify your Wiki administrator";
+    unless ( -d $Foswiki::cfg{PublishPlugin}{Dir}
+        && -w $Foswiki::cfg{PublishPlugin}{Dir} )
+    {
+        die
+"Can't publish because no useable {PublishPlugin}{Dir} was found. Please notify your Wiki administrator";
     }
 
-    Foswiki::Func::registerRESTHandler('publish', \&_publishRESTHandler);
-    Foswiki::Func::registerTagHandler(
-        'PUBLISHERS_CONTROL_CENTRE',
-        \&_publishControlCentre);
-    return 1; # coupersetique
+    Foswiki::Func::registerRESTHandler( 'publish', \&_publishRESTHandler );
+    Foswiki::Func::registerTagHandler( 'PUBLISHERS_CONTROL_CENTRE',
+        \&_publishControlCentre );
+    return 1;    # coupersetique
 }
 
-# Script function, linked from bin/publish
 sub _publishRESTHandler {
 
     require Foswiki::Plugins::PublishPlugin::Publisher;
     die $@ if $@;
 
     my $publisher = new Foswiki::Plugins::PublishPlugin::Publisher(
-       $Foswiki::Plugins::SESSION);
+        $Foswiki::Plugins::SESSION);
 
     my $query = Foswiki::Func::getCgiQuery();
-    if (defined $query->param('control')) {
+    if ( defined $query->param('control') ) {
+
         # Control UI
         $publisher->control($query);
-    } else {
-        my $web = $query->param( 'web' ) ||
-          $Foswiki::Plugins::SESSION->{webName};
+    }
+    else {
+        my $web = $query->param('web')
+          || $Foswiki::Plugins::SESSION->{webName};
         $query->delete('web');
-        $web =~ m#([\w/.]*)#; # clean up and untaint
+        $web =~ m#([\w/.]*)#;    # clean up and untaint
 
         $publisher->publishWeb($1);
     }
@@ -73,11 +75,13 @@ sub _publishRESTHandler {
 }
 
 sub _display {
-    my $msg = join('', @_);
-    if (defined $Foswiki::Plugins::SESSION->{response} &&
-          !Foswiki::Func::getContext()->{command_line}) {
+    my $msg = join( '', @_ );
+    if ( defined $Foswiki::Plugins::SESSION->{response}
+        && !Foswiki::Func::getContext()->{command_line} )
+    {
         $Foswiki::Plugins::SESSION->{response}->print($msg);
-    } else {
+    }
+    else {
         print $msg;
     }
 }
@@ -88,10 +92,9 @@ sub _publishControlCentre {
     my $query = TWiki::Func::getCgiQuery();
 
     # SMELL: check access to this interface!
-    unless( Foswiki::Func::isAnAdmin()) {
-        return CGI::span(
-            {class=>'foswikiAlert'},
-            "Only admins can access the control interface");
+    unless ( Foswiki::Func::isAnAdmin() ) {
+        return CGI::span( { class => 'foswikiAlert' },
+            "Only admins can access the control interface" );
     }
 
     my $output = CGI::p(<<HERE);
@@ -101,49 +104,57 @@ on published output files and directories. Click on the name of the
 output file to visit it.
 HERE
     my $action = $query->param('action') || '';
-    $query->delete('action'); # delete so we can redefine them
+    $query->delete('action');    # delete so we can redefine them
     my $file = $query->param('file');
     $query->delete('file');
 
-    if ($action eq 'delete') {
-        $file =~ m#([\w./\\]+)#; # untaint
+    if ( $action eq 'delete' ) {
+        $file =~ m#([\w./\\]+)#;    # untaint
         File::Path::rmtree("$Foswiki::cfg{PublishPlugin}{Dir}/$1");
         $output .= CGI::p("$1 deleted");
     }
-    if (opendir(D, $Foswiki::cfg{PublishPlugin}{Dir})) {
-        my @files = grep(!/^\./, readdir(D));
-        if (scalar(@files)) {
+    if ( opendir( D, $Foswiki::cfg{PublishPlugin}{Dir} ) ) {
+        my @files = grep( !/^\./, readdir(D) );
+        if ( scalar(@files) ) {
             $output .= CGI::start_table();
             foreach my $file (@files) {
                 my $link = "$Foswiki::cfg{PublishPlugin}{URL}/$file";
-                $link = CGI::a({href => $link}, $file);
-                my @cols = ( CGI::th($link) );
-                my $delcol = CGI::start_form({ action => '',
-                                               method=>'GET',
-                                               name => $file });
+                $link = CGI::a( { href => $link }, $file );
+                my @cols   = ( CGI::th($link) );
+                my $delcol = CGI::start_form(
+                    {
+                        action => '',
+                        method => 'GET',
+                        name   => $file
+                    }
+                );
                 $delcol .= CGI::submit(
-                    { type  => 'button',
-                      name  => 'Delete'});
-                $delcol .= CGI::hidden('file', $file);
-                $delcol .= CGI::hidden('action', 'delete');
-                $delcol .= CGI::hidden('control', '1');
+                    {
+                        type => 'button',
+                        name => 'Delete'
+                    }
+                );
+                $delcol .= CGI::hidden( 'file',    $file );
+                $delcol .= CGI::hidden( 'action',  'delete' );
+                $delcol .= CGI::hidden( 'control', '1' );
                 $delcol .= CGI::hidden('skin');
                 $delcol .= CGI::end_form();
-                push(@cols, $delcol);
-                $output .= CGI::Tr({valign=>"baseline"},
-                              join('', map {CGI::td($_)} @cols));
+                push( @cols, $delcol );
+                $output .= CGI::Tr( { valign => "baseline" },
+                    join( '', map { CGI::td($_) } @cols ) );
             }
             $output .= CGI::end_table();
-        } else {
+        }
+        else {
             $output .= "The output directory is currently empty";
         }
-    } else {
+    }
+    else {
         $output .= "Failed to open '$Foswiki::cfg{PublishPlugin}{Dir}': $!";
     }
 
     return $output;
 }
-
 
 1;
 __END__

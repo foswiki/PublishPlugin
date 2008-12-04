@@ -22,28 +22,29 @@ use Error qw( :try );
 use Foswiki::Plugins::PublishPlugin::file;
 use Foswiki::Plugins::PublishPlugin::PDFWriter;
 my $debug = 1;
-@Foswiki::Plugins::PublishPlugin::pdffiles::ISA =
-  qw(
-     Foswiki::Plugins::PublishPlugin::file
-     Foswiki::Plugins::PublishPlugin::PDFWriter);
+@Foswiki::Plugins::PublishPlugin::pdffiles::ISA = qw(
+  Foswiki::Plugins::PublishPlugin::file
+  Foswiki::Plugins::PublishPlugin::PDFWriter);
 
 sub new {
-    my( $class, $path, $web, $genopt ) = @_;
+    my ( $class, $path, $web, $genopt ) = @_;
     my $this = bless( $class->SUPER::new( $path, "${web}_$$" ), $class );
     $this->{genopt} = $genopt;
     return $this;
 }
 
 sub addString {
-    my( $this, $string, $file) = @_;
+    my ( $this, $string, $file ) = @_;
     $this->SUPER::addString( $string, $file );
-    $this->writePdf("$this->{path}/$this->{web}/$file.pdf", $file, $debug ) if( $file =~ /\.html$/ );
+    $this->writePdf( "$this->{path}/$this->{web}/$file.pdf", $file, $debug )
+      if ( $file =~ /\.html$/ );
 }
 
 sub addFile {
-    my( $this, $from, $to ) = @_;
+    my ( $this, $from, $to ) = @_;
     $this->SUPER::addFile( $from, $to );
-    $this->writePdf( "$this->{path}/$this->{web}/$to.pdf", $to, $debug ) if( $to =~ /\.html$/ );	
+    $this->writePdf( "$this->{path}/$this->{web}/$to.pdf", $to, $debug )
+      if ( $to =~ /\.html$/ );
 }
 
 sub close {

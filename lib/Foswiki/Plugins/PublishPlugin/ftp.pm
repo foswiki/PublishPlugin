@@ -28,12 +28,12 @@ use File::Temp qw(:seekable);
 use File::Spec;
 
 sub new {
-    my( $class, $path, $web, $genopt, $logger, $query ) = @_;
-    my $this = $class->SUPER::new($path, $web, $genopt, $logger, $query);
+    my ( $class, $path, $web, $genopt, $logger, $query ) = @_;
+    my $this = $class->SUPER::new( $path, $web, $genopt, $logger, $query );
 
     foreach my $param qw(destinationftpserver
-                         destinationftppath destinationftpusername
-                         destinationftppassword fastupload) {
+      destinationftppath destinationftpusername
+      destinationftppassword fastupload) {
         my $p = $query->param($param);
         $p =~ /^(.*)$/;
         $this->{$param} = $1;
@@ -42,13 +42,13 @@ sub new {
 
     $this->{fastupload} ||= 0;
     die "destinationftppath param not defined"
-      unless (defined($this->{destinationftppath}));
+      unless ( defined( $this->{destinationftppath} ) );
     die "destinationftpusername param not defined"
-      unless (defined($this->{destinationftpusername}));
-    if ($this->{destinationftpserver}) {
+      unless ( defined( $this->{destinationftpusername} ) );
+    if ( $this->{destinationftpserver} ) {
         die "destinationftppassword param not defined"
-          unless (defined($this->{destinationftppassword}));
-        if ($this->{destinationftppath} =~ /^\/?(.*)$/) {
+          unless ( defined( $this->{destinationftppassword} ) );
+        if ( $this->{destinationftppath} =~ /^\/?(.*)$/ ) {
             $this->{destinationftppath} = $1;
         }
         print "fastUpload = $this->{fastupload}<br />";
@@ -58,40 +58,42 @@ sub new {
 }
 
 sub addString {
-    my( $this, $string, $file) = @_;
+    my ( $this, $string, $file ) = @_;
 
     $this->SUPER::addString( $string, $file );
     $this->_upload($file);
 }
 
 sub addFile {
-    my( $this, $from, $to ) = @_;
+    my ( $this, $from, $to ) = @_;
     $this->SUPER::addFile( $from, $to );
 
     $this->_upload($to);
 }
 
 sub _upload {
-    my ($this, $to) = @_;
+    my ( $this, $to ) = @_;
 
-    return unless ($this->{destinationftpserver});
+    return unless ( $this->{destinationftpserver} );
 
     my $localfilePath = "$this->{path}/$this->{web}/$to";
 
     my $attempts = 0;
     my $ftp;
-    while ($attempts < 2) {
+    while ( $attempts < 2 ) {
         eval {
             $ftp = $this->_ftpConnect();
-            if ($to =~ /^\/?(.*\/)([^\/]*)$/) {
-                $ftp->mkdir($1, 1)
+            if ( $to =~ /^\/?(.*\/)([^\/]*)$/ ) {
+                $ftp->mkdir( $1, 1 )
                   or die "Cannot create directory ", $ftp->message;
             }
 
-            if ($this->{fastupload}) {
+            if ( $this->{fastupload} ) {
+
                 # Calculate checksum for local file
-                open(F, "<", $localfilePath)
-                  or die "Failed to open $localfilePath for checksum computation: $!";
+                open( F, "<", $localfilePath )
+                  or die
+                  "Failed to open $localfilePath for checksum computation: $!";
                 local $/;
                 my $data = <F>;
                 close(F);
@@ -99,71 +101,77 @@ sub _upload {
 
                 # Get checksum for remote file
                 my $remoteCS = '';
-                my $tmpFile = new File::Temp(DIR => File::Spec->tmpdir(), UNLINK => 1);
-                if ($ftp->get("$to.md5", $tmpFile)) {
+                my $tmpFile =
+                  new File::Temp( DIR => File::Spec->tmpdir(), UNLINK => 1 );
+                if ( $ftp->get( "$to.md5", $tmpFile ) ) {
+
                     # SEEK_SET to pos 0
-                    $tmpFile->seek(0, 0);
+                    $tmpFile->seek( 0, 0 );
                     $remoteCS = <$tmpFile>;
                 }
 
-                if ($localCS eq $remoteCS) {
+                if ( $localCS eq $remoteCS ) {
+
                     # Unchanged
-                    print "skipped uploading $to to $this->{destinationftpserver} (no changes) <br />";
+                    print
+"skipped uploading $to to $this->{destinationftpserver} (no changes) <br />";
                     $attempts = 2;
                     return;
-                } else {
-                    open(F, ">", "$localfilePath.md5")
+                }
+                else {
+                    open( F, ">", "$localfilePath.md5" )
                       or die "Failed to open $localfilePath.md5 for write: $!";
                     print F $localCS;
                     close(F);
 
-                    $ftp->put("$localfilePath.md5", "$to.md5")
+                    $ftp->put( "$localfilePath.md5", "$to.md5" )
                       or die "put failed ", $ftp->message;
                 }
             }
 
-            $ftp->put($localfilePath, $to)
+            $ftp->put( $localfilePath, $to )
               or die "put failed ", $ftp->message;
             print "<b>FTPed</b> $to to $this->{destinationftpserver} <br />";
             $attempts = 2;
         };
 
         if ($@) {
+
             # Got an error; try restarting the session a couple of times
             # before giving up
-            print "<font color='red'>FTP ERROR: ".$@."</font><br>";
-            if (++$attempts == 2) {
+            print "<font color='red'>FTP ERROR: " . $@ . "</font><br>";
+            if ( ++$attempts == 2 ) {
                 print "<font color='red'>Giving up on $to</font><br>\n";
                 return;
             }
             print "...retrying in 30s<br>\n";
-            eval {
-                $ftp->quit();
-            };
+            eval { $ftp->quit(); };
             $this->{ftp_interface} = undef;
             sleep(30);
-        };
+        }
     }
 }
 
 sub _ftpConnect {
     my $this = shift;
 
-    if (!$this->{ftp_interface}) {
+    if ( !$this->{ftp_interface} ) {
         require Net::FTP;
-        my $ftp =
-          Net::FTP->new($this->{destinationftpserver},
-                        Debug => 1, Timeout => 30, Passive => 1)
-              or die "Cannot connect to $this->{destinationftpserver}: $@";
-        $ftp->login($this->{destinationftpusername},
-                    $this->{destinationftppassword})
+        my $ftp = Net::FTP->new(
+            $this->{destinationftpserver},
+            Debug   => 1,
+            Timeout => 30,
+            Passive => 1
+        ) or die "Cannot connect to $this->{destinationftpserver}: $@";
+        $ftp->login( $this->{destinationftpusername},
+            $this->{destinationftppassword} )
           or die "Cannot login ", $ftp->message;
 
         $ftp->binary();
 
-        if ( $this->{destinationftppath} ne '') {
-            $ftp->mkdir($this->{destinationftppath}, 1);
-            $ftp->cwd($this->{destinationftppath})
+        if ( $this->{destinationftppath} ne '' ) {
+            $ftp->mkdir( $this->{destinationftppath}, 1 );
+            $ftp->cwd( $this->{destinationftppath} )
               or die "Cannot change working directory ", $ftp->message;
         }
         $this->{ftp_interface} = $ftp;
@@ -176,7 +184,7 @@ sub close {
 
     my $landed = $this->SUPER::close();
 
-    if ($this->{destinationftpserver}) {
+    if ( $this->{destinationftpserver} ) {
         $landed = $this->{destinationftpserver};
         $this->{ftp_interface}->quit() if $this->{ftp_interface};
         $this->{ftp_interface} = undef;

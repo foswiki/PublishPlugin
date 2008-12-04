@@ -23,21 +23,21 @@ use base 'Foswiki::Plugins::PublishPlugin::file';
 use File::Path;
 
 sub new {
-    my( $class, $path, $web, $genopt, $logger, $query ) = @_;
+    my ( $class, $path, $web, $genopt, $logger, $query ) = @_;
     return $class->SUPER::new( $path, "${web}_$$", $genopt, $logger, $query );
 }
 
 sub close {
     my $this = shift;
-    my $dir = $this->{path};
-    if ($this->{web} =~ m!^(.*)/.*?$!) {
+    my $dir  = $this->{path};
+    if ( $this->{web} =~ m!^(.*)/.*?$! ) {
         $dir .= $1;
     }
     eval { File::Path::mkpath($dir) };
     die $@ if ($@);
 
     my @files = map { "$this->{path}/$_" }
-      grep { /\.html$/ } @{$this->{files}};
+      grep { /\.html$/ } @{ $this->{files} };
 
     my $cmd = $Foswiki::cfg{PublishPlugin}{PDFCmd};
     die "{PublishPlugin}{PDFCmd} not defined" unless $cmd;
@@ -45,27 +45,29 @@ sub close {
     my $landed = "$this->{web}.pdf";
     my @extras = split( /\s+/, $this->{genopt} );
 
-    $ENV{HTMLDOC_DEBUG} = 1; # see man htmldoc - goes to apache err log
-    $ENV{HTMLDOC_NOCGI} = 1; # see man htmldoc
+    $ENV{HTMLDOC_DEBUG} = 1;    # see man htmldoc - goes to apache err log
+    $ENV{HTMLDOC_NOCGI} = 1;    # see man htmldoc
     my $sb;
-    if (defined $Foswiki::sandbox) {
-        $sb = $Foswiki::sandbox
-    } else {
+    if ( defined $Foswiki::sandbox ) {
+        $sb = $Foswiki::sandbox;
+    }
+    else {
         $sb = $Foswiki::Plugins::SESSION->{sandbox};
     }
     die "Could not find sandbox" unless $sb;
-	$sb->{TRACE} = 1;
-    my( $data, $exit ) =
-      $sb->sysCommand(
-          $cmd,
-          FILE => "$this->{path}$landed",
-          FILES => \@files,
-          EXTRAS => \@extras );
+    $sb->{TRACE} = 1;
+    my ( $data, $exit ) = $sb->sysCommand(
+        $cmd,
+        FILE   => "$this->{path}$landed",
+        FILES  => \@files,
+        EXTRAS => \@extras
+    );
+
     # htmldoc failsa lot, so log rather than dying
     $this->{logger}->logError("htmldoc failed: $exit/$data/$@") if $exit;
 
     # Get rid of the temporaries
-    unlink(@{$this->{files}});
+    unlink( @{ $this->{files} } );
 
     return $landed;
 }
