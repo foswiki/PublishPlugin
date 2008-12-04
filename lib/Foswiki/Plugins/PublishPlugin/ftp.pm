@@ -34,7 +34,7 @@ sub new {
     foreach my $param qw(destinationftpserver
       destinationftppath destinationftpusername
       destinationftppassword fastupload) {
-        my $p = $query->param($param);
+        my $p = $query->param($param) || '';
         $p =~ /^(.*)$/;
         $this->{$param} = $1;
         $query->delete($param);
