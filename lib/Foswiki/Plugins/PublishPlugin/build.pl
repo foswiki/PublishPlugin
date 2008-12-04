@@ -1,14 +1,11 @@
 #!/usr/bin/perl -w
-package PublishPluginBuild;
-
 BEGIN {
-    foreach my $pc (split(/:/, $ENV{FOSWIKI_LIBS})) {
-        unshift @INC, $pc;
-    }
+    unshift( @INC, split(/:/, $ENV{FOSWIKI_LIBS}));
 }
+use Foswiki::Contrib::Build;
 
 # Create the build object
-$build = new Foswiki::Contrib::Build("PublishPlugin", "Publish");
+$build = new Foswiki::Contrib::Build("PublishPlugin");
 
 # Build the target on the command line, or the default target
 $build->build($build->{target});
