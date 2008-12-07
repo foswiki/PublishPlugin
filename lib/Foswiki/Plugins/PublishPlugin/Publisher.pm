@@ -425,7 +425,7 @@ sub logInfo {
 sub logWarn {
     my ( $this, $message ) = @_;
     Foswiki::Plugins::PublishPlugin::_display(
-        CGI::span( { class => 'foswikiAlert' }, $message ) );
+        CGI::span( { class => 'twikiAlert' }, $message ) );
     Foswiki::Plugins::PublishPlugin::_display( CGI::br() );
     $this->{history} .= "%ORANGE% *WARNING* $message %ENDCOLOR%%BR%\n";
 }
@@ -433,7 +433,7 @@ sub logWarn {
 sub logError {
     my ( $this, $message ) = @_;
     Foswiki::Plugins::PublishPlugin::_display(
-        CGI::span( { class => 'foswikiAlert' }, "ERROR: $message" ) );
+        CGI::span( { class => 'twikiAlert' }, "ERROR: $message" ) );
     Foswiki::Plugins::PublishPlugin::_display( CGI::br() );
     $this->{history} .= "%RED% *ERROR* $message %ENDCOLOR%%BR%\n";
 }
