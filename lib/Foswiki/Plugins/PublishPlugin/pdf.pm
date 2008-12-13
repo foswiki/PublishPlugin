@@ -47,16 +47,9 @@ sub close {
 
     $ENV{HTMLDOC_DEBUG} = 1;    # see man htmldoc - goes to apache err log
     $ENV{HTMLDOC_NOCGI} = 1;    # see man htmldoc
-    my $sb;
-    if ( defined $Foswiki::sandbox ) {
-        $sb = $Foswiki::sandbox;
-    }
-    else {
-        $sb = $Foswiki::Plugins::SESSION->{sandbox};
-    }
+
     die "Could not find sandbox" unless $sb;
-    $sb->{TRACE} = 1;
-    my ( $data, $exit ) = $sb->sysCommand(
+    my ( $data, $exit ) = $Foswiki::Sandbox->sysCommand(
         $cmd,
         FILE   => "$this->{path}$landed",
         FILES  => \@files,
