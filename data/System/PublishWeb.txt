@@ -25,8 +25,9 @@ To use it, take a copy of the raw text of this topic, and paste it into a new to
       * Set PUBLISH_EXTRAS =
    * Name of the publish history topic to us. Default is PublishPluginHistory
       * Set PUBLISH_HISTORY =
-<form method="POST" name="rename" action="%SCRIPTURLPATH%/publish%SCRIPTSUFFIX%/%WEB%">
-<input type="hidden" name="configtopic" value="%TOPIC%" />
+<form method="POST" name="rename" action="%SCRIPTURLPATH{rest}%/PublishPlugin/publish">
+<input type="hidden" name="topic" value="%WEB%.%TOPIC%" />
+<input type="hidden" name="configtopic" value="%WEB%.%TOPIC%" />
 <input type="hidden" name="ping" value="%SERVERTIME%" />
 <input type="submit" class="twikiSubmit" value="Publish using this topic" />
 </form>

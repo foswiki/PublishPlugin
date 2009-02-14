@@ -58,6 +58,9 @@ sub _configureFromTopic {
     unless ( Foswiki::Func::topicExists( $cw, $ct ) ) {
         die "Specified configuration topic $cw.$ct does not exist!\n";
     }
+    # Untaint verified web and topic names
+    $cw = Foswiki::Sandbox::untaintUnchecked($cw);
+    $ct = Foswiki::Sandbox::untaintUnchecked($ct);
     my ( $cfgm, $cfgt ) = Foswiki::Func::readTopic( $cw, $ct );
     unless (
         Foswiki::Func::checkAccessPermission(
