@@ -22,17 +22,18 @@ _Previously known as !GenHTMLAddOn, !PublishAddOn, and !PublishContrib, this is 
 
 %TOC%
 
-When Foswiki generates a view, it does so dynamically i.e. there's a CGI script that runs, processes some files, and generates HTML that is displayed by the browser. There are circumstances in which this may not be desirable or even possible. For example:
-	1 Foswiki is used to create documentation which has to be bundled into a product release
+When you want to read a document stored in Foswiki, you have to have access to the web server that hosts that document. There are times when this may not be desirable, or even possible. For example:
+	1 Foswiki is used to create documentation which has to be readable off-line
 	1 Published versions of Foswiki pages must be read-only
 	1 The Foswiki server is inaccessible to the audience (e.g. on the other side of a corporate firewall)
-	
+	1 You want to put product documentation on a CD
+The PublishPlugin supports the generation of several different read-only document formats from Foswiki pages, including HTML and PDF.
 
 ---++ Features
 	* All standard Foswiki macros are interpreted
 	* Plugins are called
 	* Unresolved links to non-existent topics are silently ignored
-	* Topic links internal to the Foswiki are translated to relative links
+	* Topic links internal to Foswiki are translated to relative links
 	* Powerful support for choosing what content gets published
 	* Any links to the 'pub' areas of topics in the web are automatically resolved and the referenced files copied
 	* Any links to images outside the Foswiki are resolved, and the image is stored in the output (requires LWP)
@@ -47,11 +48,11 @@ When Foswiki generates a view, it does so dynamically i.e. there's a CGI script 
 ---+++ Publish Form
 The easiest way to publish a web is from this topic, by filling in the following form.
 
-The output is generated in a directory designated during installation. The progress messages printed during documentation generation tell you exactly where the output is. Admins can use the %<nop>PUBLISHERS_CONTROL_CENTRE% macro to manage your published output.
+The output is generated in a directory designated during installation. The progress messages printed during documentation generation tell you exactly where the output is. Admins can use the PublishPluginControlCentre to manage the published output.
 
-Publishing is a controlled process; before you can publish, you have to have VIEW access to the topics you want to publish, and CHANGE access to the publishing history topic.
+Publishing is an access-controlled process; before you can publish, you have to have VIEW access to the topics you want to publish, and CHANGE access to the publishing history topic.
 
-You can also create a [[#PublishTopic][permanent topic in a web]] to help with the publishing process.
+You can also create a [[#PublishTopic][permanent topic in a web]] to help with a repeated publishing process.
 
 <style type="text/css" media="all">
 .twikiPageForm table th,
@@ -156,11 +157,11 @@ padding:.5em;
   <td>Output format</td>
   <td>
    <select name="format" class="twikiSelect" onchange="toggle('ftp','ftpoptions')">
-    <option value="">file</option>
-    <option value="zip">zip</option>
-    <option value="tgz">tgz</option>
-    <option value="pdf">pdf</option>
-    <option value="ftp">ftp</option>
+    <option selected="selected">file</option>
+    <option>zip</option>
+    <option>tgz</option>
+    <option>pdf</option>
+    <option>ftp</option>
    </select><br />
     The output will be generated on the server, in the directory pointed to
     by the ={PublishPlugin}{Dir}= configuration setting. You can manage the
@@ -215,6 +216,18 @@ padding:.5em;
     </td>
     <td>
      =defaultpage=
+    </td>
+   </tr>
+   <tr>
+    <td>
+     Relative directory:
+    </td>
+    <td>
+     <input type="text" size="40" name="relativedir" value="/" /><br />
+     Path of a directory relative to ={PublishPlugin}{Dir}= where you want the output generated. '/' means generate the output directly in ={PublishPlugin}{Dir}=.
+    </td>
+    <td>
+     =relativedir=
     </td>
    </tr>
    <tr>
@@ -351,7 +364,7 @@ Just =cd= to the =bin= directory, and
 perl -T rest topic=PublishPlugin/publish web=Book exclusions='Web*' format=file
 perl -T rest topic=PublishPlugin/publish web=Book inclusions=WebBook format=pdf genopt='--book --duplex --toclevels=5'
 </verbatim>
-The available parameter names are shown in the example above, in the 'Name' column.
+The available parameter names are shown in the publish form above, in the last column.
 
 ---+++ Controlling which parts of a topic get published
 You can control what gets published from a topic using =%<nop>STARTPUBLISH%= and =%<nop>STOPPUBLISH%= control tags:
@@ -391,12 +404,14 @@ Note that =htmldoc= can also be used to generate !PostScript by using the =-t= o
    1 Install Archive::Zip and everything it depends on
 
 ---++ Info
-This add-on started life as the TWiki:Extensions/GenHTMLAddon, written by Foswiki:Main/CrawfordCurrie at Motorola. It was then extended by TWiki:Main/EricScouten, and then further fixed and enhanced by Foswiki:Main/CrawfordCurrie (http://c-dot.co.uk). It has also been extended by Foswiki:Main/SvenDowideit and Foswiki:Main/MartinCleaver, and most recently refactored for Foswiki by Foswiki:Main/CrawfordCurrie.
+This add-on started life as the !GenHTMLAddon, written by Foswiki:Main/CrawfordCurrie at Motorola. It was then extended by Eric Scouten, and then further fixed and enhanced by Foswiki:Main/CrawfordCurrie (http://c-dot.co.uk). It has also been extended by Foswiki:Main/SvenDowideit and Foswiki:Main/MartinCleaver, and most recently refactored for Foswiki by Foswiki:Main/CrawfordCurrie.
 
-|  Authors: | Foswiki:Main/CrawfordCurrie, TWiki:Main/EricScouten, Foswiki:Main.SvenDowideit, Foswiki:Main.MartinCleaver|
+|  Authors: | Foswiki:Main/CrawfordCurrie, Eric Scouten, Foswiki:Main.SvenDowideit, Foswiki:Main.MartinCleaver|
 |  Dependencies: | %$DEPENDENCIES% |
+|  License: | GPL |
 |  Version: | %$VERSION% |
 |  Change History: | |
+|  18 Mar 2009 | Foswikibug:Item804: automatically create publish dir Foswikibug:Item8078: support publishing to a subdir of the publish dir, under url param control
 |  14 Feb 2009 | Foswikibug:Item1033: fixed button in PublishWeb |
 |  27 Nov 2008 | Foswikibug:Item8019: refactored as a plugin and tested in Foswiki |
 |  27 Oct 2008 | TWikibug:Item5385: Fixed doc for configtopic TWikibug:Item5388: $WEB and $TOPIC were not correct in %IF statements TWikibug:Item5390: remove comments from .css before processing for included resoures TWikibug:Item5706: Improved FTP upload process for incrementally maintained webs TWikibug:Item6029: expand config topic on load to support use of searches TWikibug:Item6030: respect VIEW_TEMPLATE in published topics TWikibug:Item6092: expand common tags in configtopic TWikibug:Item6094: move sitemap options into base file generator TWikibug:Item6110: rename settings in config topic to avoid clashes with other plugins |
@@ -454,9 +469,6 @@ The 2005 functionality improvements were sponsored by [[http://www.windriver.com
 The =pdf= and =tgz= output formats were made possible by [[http://www.sabiolabs.com][ =Sabio Labs= ]]
 
 TWiki<sup>&reg;</sup> is a registered trademark of Peter Thoeny.
-
----+++ License
-As required for the publication of all extensions to TWiki, the software is published under the terms of the GNU General Public License.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of

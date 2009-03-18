@@ -7,6 +7,73 @@ use Foswiki;
 use Foswiki::Func;
 use Error ':try';
 
+my %parameters = (
+    history          => { default => 'PublishPluginHistory',
+                          validator => \&_validateWord },
+    inclusions       => { default  => '.*', validator => \&_wildcard2RE },
+    exclusions       => { default  => '', validator => \&_wildcard2RE },
+    topicsearch      => { default => '' },
+    filter           => { renamed => 'topicsearch' },
+    publishskin      => { },
+    versions         => { },
+    debug            => { default => 0 },
+    templates        => { default => 'view', validator => \&_validateList },
+    templatelocation => { validator => \&_validateDir },
+    format           => { default => 'file', validator => \&_validateWord },
+    relativedir      => { default => '', validator => \&_validateRelPath },
+    instance         => { renamed => 'relativedir' },
+    genopt           => { renamed => 'extras' },
+    publishskin      => { renamed => 'skin' },
+    enableplugins    => { validator => \&_validateList },
+);
+
+sub _wildcard2RE {
+    my $v = shift;
+    $v =~ s/([*?])/.$1/g;
+    $v =~ s/,/|/g;
+    return $v;
+}
+
+sub _validateDir {
+    my $v = shift;
+    if ( -d $v ) {
+        $v =~ /(.*)/;
+        return $1;
+    }
+    my $k = shift;
+    die "Invalid $k: '$v'";
+}
+
+sub _validateList {
+    my $v = shift;
+    if ($v =~ /^([\w, ]*)$/ ) {
+        return $1;
+    }
+    my $k = shift;
+    die "Invalid $k: '$v'";
+}
+
+sub _validateWord {
+    my $v = shift;
+    if ($v =~ /^(\w+)$/ ) {
+        return $1;
+    }
+    my $k = shift;
+    die "Invalid $k: '$v'";
+}
+
+sub _validateRelPath {
+    my $v = shift;
+    $v .= '/';
+    $v =~ s#//+#/#;
+    $v =~ s#^/##;
+    if ($v =~ m#^(.*)$# ) {
+        return $1;
+    }
+    my $k = shift;
+    die "Invalid $k: '$v'";
+}
+
 sub new {
     my ( $class, $session ) = @_;
 
@@ -21,11 +88,6 @@ sub new {
             # this records which templates (e.g. view, viewprint, viuehandheld,
             # etc) have been referred to and thus should be generated.
             templatesReferenced => {},
-            historyTopic        => 'PublishPluginHistory',
-            inclusions          => '.*',
-            exclusions          => '',
-            topicFilter         => '',
-            outputformat        => 'file',
         },
         $class
     );
@@ -38,8 +100,12 @@ sub new {
     elsif ($query) {
         $this->_configureFromQuery($query);
     }
-    $this->{publishskin} ||= Foswiki::Func::getPreferencesValue('PUBLISHSKIN')
-      || 'basic_publish';
+    foreach my $p ( keys %parameters ) {
+        next if defined $this->{$p};
+        $this->{$p} = $parameters{$p}->{default} || '';
+    }
+    $this->{publishskin} ||=
+      Foswiki::Func::getPreferencesValue('PUBLISHSKIN') || 'basic_publish';
     return $this;
 }
 
@@ -48,13 +114,23 @@ sub finish {
     $this->{session} = undef;
 }
 
+sub _setArg {
+    my ($this, $k, $v) = @_;
+    $k = $parameters{$k}->{renamed}
+      if defined $parameters{$k}->{renamed};
+    if (defined $parameters{$k}->{validator}) {
+        $this->{$k} = &{$parameters{$k}->{validator}}($v, $k);
+    } else {
+        $this->{$k} = $v;
+    }
+}
+
 sub _configureFromTopic {
     my ($this) = @_;
 
     # Parameters are defined in config topic
-    my ( $cw, $ct ) =
-      Foswiki::Func::normalizeWebTopicName( $this->{web},
-        $this->{configtopic} );
+    my ( $cw, $ct ) = Foswiki::Func::normalizeWebTopicName(
+        $this->{web}, $this->{configtopic} );
     unless ( Foswiki::Func::topicExists( $cw, $ct ) ) {
         die "Specified configuration topic $cw.$ct does not exist!\n";
     }
@@ -80,54 +156,12 @@ sub _configureFromTopic {
         next
           unless $line =~
               /^\s+\*\s+Set\s+(?:PUBLISH_)?([A-Z]+)\s*=\s*(.*?)\s*$/;
-        my $k = $1;
+
+        my $k = lc($1);
         my $v = $2;
 
-        if ( $k eq 'HISTORY' && $v ) {
-            $this->{historyTopic} = $v;
-        }
-        elsif ( $k eq 'INCLUSIONS' ) {
-            $v =~ s/([*?])/.$1/g;
-            $v =~ s/,/|/g;
-            $this->{inclusions} = $v;
-        }
-        elsif ( $k eq 'EXCLUSIONS' ) {
-            $v =~ s/([*?])/.$1/g;
-            $v =~ s/,/|/g;
-            $this->{exclusions} = $v;
-        }
-        elsif ( $k eq 'TOPICSEARCH' || $k eq 'FILTER' ) {
-            $this->{topicFilter} = $v;
-        }
-        elsif ( $k eq 'PUBLISHSKIN' || $k eq 'SKIN' ) {
-            $this->{publishskin} = $v;
-        }
-        elsif ( $k eq 'EXTRAS' ) {
-            $this->{genopt} = $v;
-        }
-        elsif ( $k eq 'FORMAT' ) {
-            $v =~ /(\w*)/;
-            $this->{outputformat} = $1;
-        }
-        elsif ( $k eq 'DEBUG' ) {
-            $this->{debug} = $v;
-        }
-        elsif ( $k eq 'VERSIONS' ) {
-            $this->{versionstopic} = $v;
-        }
-        elsif ( $k eq 'TEMPLATES' ) {
-            $v =~ /([\w,]*)/;
-            $this->{templatesWanted} = $1;
-        }
-        elsif ( $k eq 'TEMPLATELOCATION' ) {
-            if ( -d $v ) {
-                $v =~ /(.*)/;
-                $this->{templateLocation} = $1;
-            }
-        }
-        elsif ( $k eq 'INSTANCE' ) {
-            $Foswiki::cfg{PublishPlugin}{Dir} .= $v . '/' if $v;
-            $Foswiki::cfg{PublishPlugin}{URL} .= $v . '/' if $v;
+        if (defined $parameters{$k}) {
+            $this->_setArg($k, $v);
         }
     }
 }
@@ -136,60 +170,20 @@ sub _configureFromQuery {
     my ( $this, $query ) = @_;
 
     # Parameters are defined in the query
-    if ( defined( $query->param('history') ) ) {
-        my $v = $query->param('history');
-        if ( $v =~ /(\w+)/ ) {
-            $this->{historyTopic} = $1;
+    foreach my $k (keys %parameters) {
+        if ( defined( $query->param($k) ) ) {
+            my $v = $query->param($k);
+            $this->_setArg($k, $v);
+            $query->delete( $k );
         }
-        $query->delete('history');
     }
-    if ( defined( $query->param('inclusions') ) ) {
-        my $v = $query->param('inclusions');
-        $v =~ s/([*?])/.$1/g;
-        $v =~ s/,/|/g;
-        $this->{inclusions} = $v;
-        $query->delete('inclusions');
-    }
-    if ( defined( $query->param('exclusions') ) ) {
-        my $v = $query->param('exclusions');
-        $v =~ s/([*?])/.$1/g;
-        $v =~ s/,/|/g;
-        $this->{exclusions} = $v;
-        $query->delete('exclusions');
-    }
-    if ( defined( $query->param('versions') ) ) {
-        my $v = $query->param('versions');
-        $this->{versionstopic} = $v;
-        $query->delete('versions');
-    }
-    if ( defined $query->param('enableplugins') ) {
-        my $v = $query->param('enableplugins');
-        $this->{enableplugins} = $v;
-        $query->delete('enableplugins');
-    }
-    $this->{topicFilter} =
-         $query->param('filter')
-      || $query->param('topicsearch')
-      || '';
-    $this->{genopt} = $query->param('genopt') || '';
 
-    # 'compress' retained for compatibility
+    # 'compress' undocumented but retained for compatibility
     if ( defined $query->param('compress') ) {
         my $v = $query->param('compress');
         if ( $v =~ /(\w+)/ ) {
-            $this->{outputformat} = $1;
+            $this->{format} = $1;
         }
-    }
-    elsif ( defined $query->param('format') ) {
-        my $v = $query->param('format') || '';
-        if ( $v =~ /(\w+)/ ) {
-            $this->{outputformat} = $1;
-        }
-    }
-    $this->{publishskin} = $query->param('skin')
-      || $query->param('publishskin');
-    foreach my $param qw(filter topicsearch genopt compress format) {
-        $query->delete($param);
     }
 }
 
@@ -210,7 +204,7 @@ sub publishWeb {
 
     my ( $hw, $ht ) =
       Foswiki::Func::normalizeWebTopicName( $this->{web},
-        $this->{historyTopic} );
+        $this->{history} );
     unless (
         Foswiki::Func::checkAccessPermission(
             'CHANGE', Foswiki::Func::getWikiName(),
@@ -225,7 +219,7 @@ This topic must be editable by the user doing the publishing.
 TEXT
     }
     $this->{historyWeb}   = $hw;
-    $this->{historyTopic} = $ht;
+    $this->{history} = $ht;
 
     # Generate the progress information screen (based on the view template)
     my ( $header, $footer ) = ( '', '' );
@@ -261,28 +255,28 @@ TEXT
     $Foswiki::cfg{PublishPlugin}{URL} .= '/'
       unless $Foswiki::cfg{PublishPlugin}{URL} =~ m#/$#;
 
-    $this->logInfo( "Publisher", $this->{publisher} );
-    $this->logInfo( "Date",      Foswiki::Func::formatTime( time() ) );
-    $this->logInfo( "{PublishPlugin}{Dir}", $Foswiki::cfg{PublishPlugin}{Dir} );
-    $this->logInfo( "{PublishPlugin}{URL}", $Foswiki::cfg{PublishPlugin}{URL} );
-    $this->logInfo( "Web",                  $this->{web} );
-    $this->logInfo( "Versions topic",       $this->{versionstopic} )
-      if $this->{versionstopic};
-    $this->logInfo( "Content Generator", $this->{outputformat} );
+    $this->logInfo( "Publisher",         $this->{publisher} );
+    $this->logInfo( "Date",              Foswiki::Func::formatTime( time() ) );
+    $this->logInfo( "Dir",               "$Foswiki::cfg{PublishPlugin}{Dir}$this->{relativedir}" );
+    $this->logInfo( "URL",               "$Foswiki::cfg{PublishPlugin}{URL}$this->{relativedir}" );
+    $this->logInfo( "Web",               $this->{web} );
+    $this->logInfo( "Versions topic",    $this->{versions} )
+      if $this->{versions};
+    $this->logInfo( "Content Generator", $this->{format} );
     $this->logInfo( "Config topic",      $this->{configtopic} )
       if $this->{configtopic};
     $this->logInfo( "Skin",              $this->{publishskin} );
     $this->logInfo( "Inclusions",        $this->{inclusions} );
     $this->logInfo( "Exclusions",        $this->{exclusions} );
-    $this->logInfo( "Content Filter",    $this->{topicFilter} );
-    $this->logInfo( "Generator Options", $this->{genopt} );
+    $this->logInfo( "Content Filter",    $this->{topicsearch} );
+    $this->logInfo( "Generator Options", $this->{extras} );
     $this->logInfo( "Enabled Plugins",   $enabledPlugins );
     $this->logInfo( "Disabled Plugins",  $disabledPlugins );
 
-    if ( $this->{versionstopic} ) {
+    if ( $this->{versions} ) {
         $this->{topicVersions} = {};
         my ( $vweb, $vtopic ) =
-          Foswiki::Func::normalizeWebTopicName( $web, $this->{versionstopic} );
+          Foswiki::Func::normalizeWebTopicName( $web, $this->{versions} );
         die "Versions topic $vweb.$vtopic does not exist"
           unless Foswiki::Func::topicExists( $vweb, $vtopic );
         my ( $meta, $text ) = Foswiki::Func::readTopic( $vweb, $vtopic );
@@ -313,30 +307,39 @@ TEXT
           unless $count;
     }
 
-    my @templatesWanted = split( /,/, $this->{templatesWanted} );
+    my @templatesWanted = split( /[, ]+/, $this->{templates} );
 
     foreach my $template (@templatesWanted) {
         next unless $template;
         $this->{templatesReferenced}->{$template} = 1;
         my $dir =
-          $Foswiki::cfg{PublishPlugin}{Dir} . $this->_dirForTemplate($template);
+          "$Foswiki::cfg{PublishPlugin}{Dir}$this->{relativedir}"
+            . $this->_dirForTemplate($template);
+
+        File::Path::mkpath($dir);
 
         my $generator =
-          'Foswiki::Plugins::PublishPlugin::' . $this->{outputformat};
+          'Foswiki::Plugins::PublishPlugin::' . $this->{format};
         eval 'use ' . $generator;
         unless ($@) {
             eval {
                 $this->{archive} =
-                  $generator->new( $dir, $this->{web}, $this->{genopt}, $this,
-                    TWiki::Func::getCgiQuery() );
+                  $generator->new( $dir, $this->{web}, $this->{extras}, $this,
+                    Foswiki::Func::getCgiQuery() );
             };
         }
         if ( $@ || ( !$this->{archive} ) ) {
             die
-"Failed to initialise '$this->{outputformat}' ($generator) generator: <pre>$@</pre>\n",
+"Failed to initialise '$this->{format}' ($generator) generator: <pre>$@</pre>\n",
               $footer;
         }
         $this->publishUsingTemplate($template);
+
+        my $landed = $this->{archive}->close();
+
+        $this->logInfo( "Published To", <<LINK);
+<a href="$Foswiki::cfg{PublishPlugin}{URL}$this->{relativedir}$landed">$landed</a>
+LINK
     }
 
     # check the templates referenced, and that everything referenced
@@ -355,21 +358,16 @@ Used.
 BLAH
     }
 
-    my $landed = $this->{archive}->close();
-
-    $this->logInfo( "Published To", <<LINK);
-<a href="$Foswiki::cfg{PublishPlugin}{URL}$landed">$landed</a>
-LINK
     my ( $meta, $text ) =
-      Foswiki::Func::readTopic( $this->{historyWeb}, $this->{historyTopic} );
+      Foswiki::Func::readTopic( $this->{historyWeb}, $this->{history} );
     $text =~ s/(^|\n)---\+ Last Published\n.*$//s;
     Foswiki::Func::saveTopic(
-        $this->{historyWeb}, $this->{historyTopic}, $meta,
-        "$text---+ Last Published\n$this->{history}\n",
+        $this->{historyWeb}, $this->{history}, $meta,
+        "$text---+ Last Published\n$this->{historyText}\n",
         { minor => 1, forcenewrevision => 1 }
     );
     my $url =
-      Foswiki::Func::getScriptUrl( $this->{historyWeb}, $this->{historyTopic},
+      Foswiki::Func::getScriptUrl( $this->{historyWeb}, $this->{history},
         'view' );
     $this->logInfo( "History saved in", "<a href='$url'>$url</a>" );
 
@@ -420,9 +418,10 @@ sub arrayDiff {
 
 sub logInfo {
     my ( $this, $header, $body ) = @_;
+    $body ||= '';
     Foswiki::Plugins::PublishPlugin::_display( CGI::b("$header:&nbsp;"),
         $body, CGI::br() );
-    $this->{history} .= "<b> $header </b>$body%BR%\n";
+    $this->{historyText} .= "<b> $header </b>$body%BR%\n";
 }
 
 sub logWarn {
@@ -430,7 +429,7 @@ sub logWarn {
     Foswiki::Plugins::PublishPlugin::_display(
         CGI::span( { class => 'twikiAlert' }, $message ) );
     Foswiki::Plugins::PublishPlugin::_display( CGI::br() );
-    $this->{history} .= "%ORANGE% *WARNING* $message %ENDCOLOR%%BR%\n";
+    $this->{historyText} .= "%ORANGE% *WARNING* $message %ENDCOLOR%%BR%\n";
 }
 
 sub logError {
@@ -438,7 +437,7 @@ sub logError {
     Foswiki::Plugins::PublishPlugin::_display(
         CGI::span( { class => 'twikiAlert' }, "ERROR: $message" ) );
     Foswiki::Plugins::PublishPlugin::_display( CGI::br() );
-    $this->{history} .= "%RED% *ERROR* $message %ENDCOLOR%%BR%\n";
+    $this->{historyText} .= "%RED% *ERROR* $message %ENDCOLOR%%BR%\n";
 }
 
 #  Publish the contents of one web using the given template (e.g. view)
@@ -457,7 +456,7 @@ sub publishUsingTemplate {
     # Attempt to render each included page.
     my %copied;
     foreach my $topic (@topics) {
-        next if $topic eq $this->{historyTopic};    # never publish this
+        next if $topic eq $this->{history};    # never publish this
         try {
             my $dispo = '';
             if ( $this->{inclusions} && $topic !~ /^($this->{inclusions})$/ ) {
@@ -519,7 +518,7 @@ sub publishTopic {
         return;
     }
 
-    if ( $this->{topicFilter} && $text =~ /$this->{topicFilter}/ ) {
+    if ( $this->{topicsearch} && $text =~ /$this->{topicsearch}/ ) {
         $this->logInfo( $topic, "excluded by filter" );
         return;
     }

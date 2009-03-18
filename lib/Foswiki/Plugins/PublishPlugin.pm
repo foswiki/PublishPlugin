@@ -10,21 +10,15 @@ use Error qw( :try );
 
 use strict;
 
-our $VERSION = '$Rev: 17708 $';
+our $VERSION = '$Rev$';
 our $RELEASE = '04 Dec 2008';
 our $SHORTDESCRIPTION =
 'Generate static output (HTML, PDF) optionally upload (FTP) the output to a publishing site.';
 
 sub initPlugin {
     unless ( defined $Foswiki::cfg{PublishPlugin}{Dir} ) {
-        die "{PublishPlugin}{Dir} not defined; run install script";
-    }
-    unless ( -d $Foswiki::cfg{PublishPlugin}{Dir} ) {
         die
-"{PublishPlugin}{Dir} $Foswiki::cfg{PublishPlugin}{Dir} does not exist";
-    }
-    unless ( $Foswiki::cfg{PublishPlugin}{Dir} =~ m!/$! ) {
-        die "{PublishPlugin}{Dir} must terminate in a slash";
+"Can't publish because {PublishPlugin}{Dir} was not set. Please notify your Wiki administrator";
     }
     unless ( $Foswiki::cfg{PublishPlugin}{URL} ) {
         die
