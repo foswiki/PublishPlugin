@@ -33,10 +33,10 @@ The PublishPlugin supports the generation of several different read-only documen
 	* All standard Foswiki macros are interpreted
 	* Plugins are called
 	* Unresolved links to non-existent topics are silently ignored
-	* Topic links internal to Foswiki are translated to relative links
+	* Topic links internal to the wiki are translated to relative links
 	* Powerful support for choosing what content gets published
 	* Any links to the 'pub' areas of topics in the web are automatically resolved and the referenced files copied
-	* Any links to images outside the Foswiki are resolved, and the image is stored in the output (requires LWP)
+	* Any links to images outside the wiki are resolved, and the image is stored in the output (requires LWP)
 	* Output in HTML or PDF. HTML can be compressed in different archive formats.
 	* Full support for hierarchical webs
 	* Multiple instances (e.g. dev, test, prod) can be specified
