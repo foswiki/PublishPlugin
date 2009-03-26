@@ -43,13 +43,13 @@ sub close {
     die "{PublishPlugin}{PDFCmd} not defined" unless $cmd;
 
     my $landed = "$this->{web}.pdf";
-    my @extras = split( /\s+/, $this->{genopt} );
+    my @extras = split( /\s+/, $this->{genopt} || '' );
 
     $ENV{HTMLDOC_DEBUG} = 1;    # see man htmldoc - goes to apache err log
     $ENV{HTMLDOC_NOCGI} = 1;    # see man htmldoc
 
-    die "Could not find sandbox" unless $sb;
-    my ( $data, $exit ) = $Foswiki::Sandbox->sysCommand(
+    my ( $data, $exit ) = Foswiki::Sandbox::sysCommand(
+        undef,
         $cmd,
         FILE   => "$this->{path}$landed",
         FILES  => \@files,
