@@ -9,7 +9,7 @@ use Error ':try';
 
 my %parameters = (
     history          => { default => 'PublishPluginHistory',
-                          validator => \&_validateWord },
+                          validator => \&_validateTopic },
     inclusions       => { default  => '.*', validator => \&_wildcard2RE },
     exclusions       => { default  => '', validator => \&_wildcard2RE },
     topicsearch      => { default => '' },
@@ -48,6 +48,15 @@ sub _validateList {
     my $v = shift;
     if ($v =~ /^([\w, ]*)$/ ) {
         return $1;
+    }
+    my $k = shift;
+    die "Invalid $k: '$v'";
+}
+
+sub _validateTopic {
+    my $v = shift;
+    if (Foswiki::Func::isValidTopicName($v, 1)) {
+        return Foswiki::Sandbox::untaintUnchecked($v);
     }
     my $k = shift;
     die "Invalid $k: '$v'";
@@ -473,6 +482,9 @@ sub publishUsingTemplate {
                     \%copied )
                   || '0';
                 $dispo = "Rev $rev published";
+                $topic = '<a href="'.Foswiki::Func::getScriptUrl(
+                    $this->{web}, $topic, 'view', rev=>$rev).'">'
+                      .$topic.'</a>';
             }
             $this->logInfo( $topic, $dispo );
         }

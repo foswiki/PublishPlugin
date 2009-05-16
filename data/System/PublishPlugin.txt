@@ -411,7 +411,7 @@ This add-on started life as the !GenHTMLAddon, written by Foswiki:Main/CrawfordC
 |  License: | GPL |
 |  Version: | %$VERSION% |
 |  Change History: | |
-|  16 May 2009 | Foswikibug:Item1626: fixed META{"formfield" Foswikibug:Item8150: (Marc Schaefer) fix for -skin parameter Foswikibug:Item1557: doc fix |
+|  16 May 2009 | Foswikibug:Item1626: fixed META{"formfield" Foswikibug:Item8150: (Marc Schaefer) fix for -skin parameter Foswikibug:Item1557: doc fix Foswikibug:Item1585: allow history topic in different web |
 |  18 Mar 2009 | Foswikibug:Item804: automatically create publish dir Foswikibug:Item8078: support publishing to a subdir of the publish dir, under url param control
 |  14 Feb 2009 | Foswikibug:Item1033: fixed button in PublishWeb |
 |  27 Nov 2008 | Foswikibug:Item8019: refactored as a plugin and tested in Foswiki |
