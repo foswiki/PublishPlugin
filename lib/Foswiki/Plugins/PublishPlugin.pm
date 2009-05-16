@@ -4,8 +4,8 @@
 #
 package Foswiki::Plugins::PublishPlugin;
 
-use Foswiki;
-use Foswiki::Func;
+use Foswiki ();
+use Foswiki::Func ();
 use Error qw( :try );
 
 use strict;

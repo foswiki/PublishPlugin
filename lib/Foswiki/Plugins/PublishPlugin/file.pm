@@ -31,6 +31,7 @@ sub new {
 
     foreach my $param qw(defaultpage googlefile relativeurl) {
         my $p = $query->param($param);
+        die $param unless defined $p;
         $p =~ /^(.*)$/;
         $this->{$param} = $1;
         $query->delete($param);

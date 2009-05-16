@@ -548,6 +548,8 @@ sub publishTopic {
     ( $meta, $text ) =
       Foswiki::Func::readTopic( $this->{web}, $topic, $publishedRev );
 
+    $Foswiki::Plugins::SESSION->enterContext( 'can_render_meta', $meta );
+
     # Allow a local definition of VIEW_TEMPLATE to override the
     # template passed in (unless this is disabled by a global option)
     my $override = Foswiki::Func::getPreferencesValue('VIEW_TEMPLATE');
