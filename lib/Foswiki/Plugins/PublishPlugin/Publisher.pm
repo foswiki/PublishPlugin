@@ -23,7 +23,7 @@ my %parameters = (
     relativedir      => { default => '', validator => \&_validateRelPath },
     instance         => { renamed => 'relativedir' },
     genopt           => { renamed => 'extras' },
-    publishskin      => { renamed => 'skin' },
+    skin             => { renamed => 'publishskin' },
     enableplugins    => { validator => \&_validateList },
 );
 

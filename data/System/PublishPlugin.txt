@@ -359,10 +359,10 @@ To use a publish topic, you must pass the =configtopic= parameter to the =publis
 
 ---+++ Publishing from the command line
 Just =cd= to the =bin= directory, and
-=perl -T rest topic=PublishPlugin/publish=. Parameters are passed as name=value pairs, for example:
+=perl -T rest /PublishPlugin/publish=. Parameters are passed as name=value pairs, for example:
 <verbatim>
-perl -T rest topic=PublishPlugin/publish web=Book exclusions='Web*' format=file
-perl -T rest topic=PublishPlugin/publish web=Book inclusions=WebBook format=pdf genopt='--book --duplex --toclevels=5'
+perl -T rest /PublishPlugin/publish web=Book exclusions='Web*' format=file
+perl -T rest /PublishPlugin/publish web=Book inclusions=WebBook format=pdf genopt='--book --duplex --toclevels=5'
 </verbatim>
 The available parameter names are shown in the publish form above, in the last column.
 
@@ -411,6 +411,7 @@ This add-on started life as the !GenHTMLAddon, written by Foswiki:Main/CrawfordC
 |  License: | GPL |
 |  Version: | %$VERSION% |
 |  Change History: | |
+|  16 May 2009 | Foswikibug:Item1626: fixed META{"formfield" Foswikibug:Item8150: (Marc Schaefer) fix for -skin parameter Foswikibug:Item1557: doc fix |
 |  18 Mar 2009 | Foswikibug:Item804: automatically create publish dir Foswikibug:Item8078: support publishing to a subdir of the publish dir, under url param control
 |  14 Feb 2009 | Foswikibug:Item1033: fixed button in PublishWeb |
 |  27 Nov 2008 | Foswikibug:Item8019: refactored as a plugin and tested in Foswiki |
