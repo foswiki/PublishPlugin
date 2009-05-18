@@ -85,11 +85,13 @@ sub _publishControlCentre {
 
     my $query = TWiki::Func::getCgiQuery();
 
-    # SMELL: check access to this interface!
-    unless ( Foswiki::Func::isAnAdmin() ) {
+    # Check access to this interface!
+    if ( defined &Foswiki::Func::isAnAdmin && !Foswiki::Func::isAnAdmin() ) {
         return CGI::span( { class => 'twikiAlert' },
             "Only admins can access the control interface" );
     }
+    # Old code doesn't have isAnAdmin so will allow access to
+    # the control UI for everyone. Caveat emptor.
 
     my $output = CGI::p(<<HERE);
 <h1>Publishers Control Interface</h1>

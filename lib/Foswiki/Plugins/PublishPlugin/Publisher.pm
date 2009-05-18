@@ -55,6 +55,10 @@ sub _validateList {
 
 sub _validateTopic {
     my $v = shift;
+    unless (defined &Foswiki::Func::isValidTopicName) {
+        # Old code doesn't have this. Caveat emptor.
+        return Foswiki::Sandbox::untaintUnchecked($v);
+    }
     if (Foswiki::Func::isValidTopicName($v, 1)) {
         return Foswiki::Sandbox::untaintUnchecked($v);
     }
