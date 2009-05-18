@@ -436,7 +436,7 @@ sub logInfo {
 sub logWarn {
     my ( $this, $message ) = @_;
     Foswiki::Plugins::PublishPlugin::_display(
-        CGI::span( { class => 'twikiAlert' }, $message ) );
+        CGI::span( { class => 'foswikiAlert' }, $message ) );
     Foswiki::Plugins::PublishPlugin::_display( CGI::br() );
     $this->{historyText} .= "%ORANGE% *WARNING* $message %ENDCOLOR%%BR%\n";
 }
@@ -444,7 +444,7 @@ sub logWarn {
 sub logError {
     my ( $this, $message ) = @_;
     Foswiki::Plugins::PublishPlugin::_display(
-        CGI::span( { class => 'twikiAlert' }, "ERROR: $message" ) );
+        CGI::span( { class => 'foswikiAlert' }, "ERROR: $message" ) );
     Foswiki::Plugins::PublishPlugin::_display( CGI::br() );
     $this->{historyText} .= "%RED% *ERROR* $message %ENDCOLOR%%BR%\n";
 }
@@ -536,7 +536,7 @@ sub publishTopic {
     }
 
     # clone the current session
-    my $oldSession = $Foswiki::Plugins::SESSION;
+    my $oldSession;
     my $query      = Foswiki::Func::getCgiQuery();
     $query->param( 'topic', "$this->{web}.$topic" );
 
@@ -548,8 +548,8 @@ sub publishTopic {
         # Create a new session so that the contexts are correct. This is
         # really, really inefficient, but is essential to maintain correct
         # prefs if we don't have a modern Func
-        my $twiki = new Foswiki( $this->{publisher}, $query );
-        $Foswiki::Plugins::SESSION = $twiki;
+        $oldSession = $Foswiki::Plugins::SESSION;
+        $Foswiki::Plugins::SESSION = new Foswiki( $this->{publisher}, $query );
     }
 
     # Because of Item5388, we have to re-read the topic to get the
@@ -607,7 +607,10 @@ sub publishTopic {
       Foswiki::Func::expandCommonVariables( $tmpl, $topic, $this->{web},
         $meta );
 
-    # Inject the text into the template
+    # Inject the text into the template. The extra \n is required to
+    # simulate the way the view script splits up the topic and reassembles
+    # it around newlines.
+    $text = "\n$text" unless $text =~ /^\n/s;
     $tmpl =~ s/%TEXT%/$text/g;
 
     # legacy
@@ -617,7 +620,6 @@ sub publishTopic {
     $tmpl =~ s/%MAXREV%/$maxrev/g;
     $tmpl =~ s/%CURRREV%/$maxrev/g;
     $tmpl =~ s/%REVTITLE%//g;
-
     $tmpl = Foswiki::Func::renderText( $tmpl, $this->{web} );
 
     $tmpl =~ s|( ?) *</*nop/*>\n?|$1|gois;
@@ -672,7 +674,11 @@ sub publishTopic {
     # Write the resulting HTML.
     $this->{archive}->addString( $tmpl, $topic . $filetype );
 
-    $Foswiki::Plugins::SESSION = $oldSession;    # restore twiki object
+    if ( defined &Foswiki::Func::popTopicContext ) {
+        Foswiki::Func::popTopicContext( );
+    } else {
+        $Foswiki::Plugins::SESSION = $oldSession;    # restore session
+    }
 
     return $publishedRev;
 }
@@ -727,7 +733,7 @@ sub _filetypeForTemplate {
     return '.html';
 }
 
-#  Copy a resource (image, style sheet, etc.) from twiki/pub/%WEB% to
+#  Copy a resource (image, style sheet, etc.) from pub/%WEB% to
 #   static HTML's rsrc directory.
 #   * =$this->{web}= - name of web
 #   * =$rsrcName= - name of resource (relative to pub/%WEB%)
