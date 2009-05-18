@@ -48,8 +48,9 @@ sub close {
     $ENV{HTMLDOC_DEBUG} = 1;    # see man htmldoc - goes to apache err log
     $ENV{HTMLDOC_NOCGI} = 1;    # see man htmldoc
 
+    $this->{path} .= '/' unless $this->{path} =~ m#/$#;
     my ( $data, $exit ) = Foswiki::Sandbox::sysCommand(
-        undef,
+        $Foswiki::sharedSandbox,
         $cmd,
         FILE   => "$this->{path}$landed",
         FILES  => \@files,
