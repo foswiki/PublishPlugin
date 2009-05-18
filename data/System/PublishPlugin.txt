@@ -410,7 +410,7 @@ This add-on started life as the !GenHTMLAddon, written by Foswiki:Main/CrawfordC
 |  Version: | %$VERSION% |
 |  Change History: | |
 |  16 May 2009 | Foswikitask:Item1626: fixed META{"formfield" Foswikitask:Item8150: (Marc Schaefer) fix for -skin parameter Foswikitask:Item1557: doc fix Foswikitask:Item1585: allow history topic in different web Foswikitask:Item871: add missing newline at start of topic text. Foswikitask:Item1449: topic publisher was not popping the context correctly Foswikitask:Item1632: improve backporting support |
-|  18 Mar 2009 | Foswikitask:Item804: automatically create publish dir Foswikitask:Item8078: support publishing to a subdir of the publish dir, under url param control
+|  18 Mar 2009 | Foswikitask:Item804: automatically create publish dir Foswikitask:Item8078: support publishing to a subdir of the publish dir, under url param control |
 |  14 Feb 2009 | Foswikitask:Item1033: fixed button in PublishWeb |
 |  27 Nov 2008 | Foswikitask:Item8019: refactored as a plugin and tested in Foswiki |
 |  27 Oct 2008 | Item5385: Fixed doc for configtopic Item5388: $WEB and $TOPIC were not correct in %IF statements Item5390: remove comments from .css before processing for included resoures Item5706: Improved FTP upload process for incrementally maintained webs Item6029: expand config topic on load to support use of searches Item6030: respect VIEW_TEMPLATE in published topics Item6092: expand common tags in configtopic Item6094: move sitemap options into base file generator Item6110: rename settings in config topic to avoid clashes with other plugins |
