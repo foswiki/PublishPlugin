@@ -1,4 +1,4 @@
-# Copyright (C) 2005 Crawford Currie, http://c-dot.co.uk
+# Copyright (C) 2005-2009 Crawford Currie, http://c-dot.co.uk
 # Copyright (C) 2006 Martin Cleaver, http://www.cleaver.org
 #
 # This program is free software; you can redistribute it and/or
@@ -20,9 +20,13 @@
 # TODO: clean up ftp site, removing/archiving/backing up old version
 
 package Foswiki::Plugins::PublishPlugin::ftp;
-use base 'Foswiki::Plugins::PublishPlugin::file';
 
 use strict;
+
+# Inherit from file backend; we use the local copy as the cache for
+# uploading from
+use Foswiki::Plugins::PublishPlugin::file;
+our @ISA = ( 'Foswiki::Plugins::PublishPlugin::file' );
 
 use File::Temp qw(:seekable);
 use File::Spec;
@@ -34,10 +38,10 @@ sub new {
     foreach my $param qw(destinationftpserver
       destinationftppath destinationftpusername
       destinationftppassword fastupload) {
-        my $p = $query->param($param) || '';
+        my $p = $query->param($param);
+        die "'$param' query parameter missing" unless $p;
         $p =~ /^(.*)$/;
         $this->{$param} = $1;
-        $query->delete($param);
     }
 
     $this->{fastupload} ||= 0;
@@ -91,12 +95,14 @@ sub _upload {
             if ( $this->{fastupload} ) {
 
                 # Calculate checksum for local file
-                open( F, "<", $localfilePath )
+                my $fh;
+                open( $fh, '<', $localfilePath )
                   or die
                   "Failed to open $localfilePath for checksum computation: $!";
                 local $/;
-                my $data = <F>;
-                close(F);
+                binmode($fh);
+                my $data = <$fh>;
+                close($fh);
                 my $localCS = Digest::MD5::md5($data);
 
                 # Get checksum for remote file
@@ -119,10 +125,12 @@ sub _upload {
                     return;
                 }
                 else {
-                    open( F, ">", "$localfilePath.md5" )
+                    my $fh;
+                    open( $fh, '>', "$localfilePath.md5" )
                       or die "Failed to open $localfilePath.md5 for write: $!";
-                    print F $localCS;
-                    close(F);
+                    binmode($fh);
+                    print $fh $localCS;
+                    close($fh);
 
                     $ftp->put( "$localfilePath.md5", "$to.md5" )
                       or die "put failed ", $ftp->message;

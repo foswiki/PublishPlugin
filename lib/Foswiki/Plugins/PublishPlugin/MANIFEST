@@ -5,6 +5,7 @@ pub/System/PublishPlugin/publish.gif 0644
 lib/Foswiki/Plugins/PublishPlugin.pm 0444
 lib/Foswiki/Plugins/PublishPlugin/Config.spec 0444
 lib/Foswiki/Plugins/PublishPlugin/Publisher.pm 0444
+lib/Foswiki/Plugins/PublishPlugin/BackEnd.pm 0444
 lib/Foswiki/Plugins/PublishPlugin/file.pm 0444
 lib/Foswiki/Plugins/PublishPlugin/ftp.pm 0444
 lib/Foswiki/Plugins/PublishPlugin/pdf.pm 0444

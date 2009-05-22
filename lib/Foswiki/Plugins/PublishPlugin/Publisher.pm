@@ -6,6 +6,7 @@ use strict;
 use Foswiki;
 use Foswiki::Func;
 use Error ':try';
+use Assert;
 
 my %parameters = (
     history          => { default => 'PublishPluginHistory',
@@ -215,25 +216,6 @@ sub publishWeb {
         $Foswiki::Plugins::SESSION->renderer()->{NEWLINKSYMBOL} = '';
     }
 
-    my ( $hw, $ht ) =
-      Foswiki::Func::normalizeWebTopicName( $this->{web},
-        $this->{history} );
-    unless (
-        Foswiki::Func::checkAccessPermission(
-            'CHANGE', Foswiki::Func::getWikiName(),
-            undef, $ht, $hw
-        )
-      )
-    {
-        die <<TEXT;
-Can't publish because $this->{publisher} can't CHANGE
-$hw.$ht.
-This topic must be editable by the user doing the publishing.
-TEXT
-    }
-    $this->{historyWeb}   = $hw;
-    $this->{history} = $ht;
-
     # Generate the progress information screen (based on the view template)
     my ( $header, $footer ) = ( '', '' );
     unless ( Foswiki::Func::getContext()->{command_line} ) {
@@ -246,6 +228,26 @@ TEXT
         }
         ( $header, $footer ) = $this->_getPageTemplate();
     }
+
+    my ( $hw, $ht ) =
+      Foswiki::Func::normalizeWebTopicName( $this->{web},
+        $this->{history} );
+    unless (
+        Foswiki::Func::checkAccessPermission(
+            'CHANGE', Foswiki::Func::getWikiName(),
+            undef, $ht, $hw
+        )
+      )
+    {
+        $this->logError(<<TEXT, $footer);
+Can't publish because $this->{publisher} can't CHANGE
+$hw.$ht.
+This topic must be editable by the user doing the publishing.
+TEXT
+        return;
+    }
+    $this->{historyWeb}   = $hw;
+    $this->{history} = $ht;
 
     # Disable unwanted plugins
     my $enabledPlugins  = '';
@@ -342,9 +344,11 @@ TEXT
             };
         }
         if ( $@ || ( !$this->{archive} ) ) {
-            die
-"Failed to initialise '$this->{format}' ($generator) generator: <pre>$@</pre>\n",
-              $footer;
+            $this->logError(<<ERROR, $footer);
+Failed to initialise '$this->{format}' ($generator) generator:
+<pre>$@</pre>
+ERROR
+            return;
         }
         $this->publishUsingTemplate($template);
 
@@ -540,19 +544,37 @@ sub publishTopic {
     }
 
     # clone the current session
-    my $oldSession;
+    my %old;
     my $query      = Foswiki::Func::getCgiQuery();
     $query->param( 'topic', "$this->{web}.$topic" );
 
     if ( defined &Foswiki::Func::pushTopicContext ) {
+        # SMELL: Have to hack into the core to set internal preferences :-(
+        foreach my $macro qw(BASEWEB BASETOPIC INCLUDINGWEB INCLUDINGTOPIC) {
+            $old{$macro} = Foswiki::Func::getPreferencesValue($macro);
+        }
         Foswiki::Func::pushTopicContext( $this->{web}, $topic );
+        my $prefs = $Foswiki::Plugins::SESSION->{prefs};
+        if ($prefs && $prefs->can('setInternalPreferences')) {
+            $prefs->setInternalPreferences(
+                BASEWEB => $this->{web},
+                BASETOPIC => $topic,
+                INCLUDINGWEB => $this->{web},
+                INCLUDINGTOPIC => $topic);
+        } else {
+            my $stags = $Foswiki::Plugins::SESSION->{SESSION_TAGS};
+            $stags->{BASEWEB} = $this->{web};
+            $stags->{BASETOPIC} = $topic;
+            $stags->{INCLUDINGWEB} = $this->{web};
+            $stags->{INCLUDINGTOPIC} = $topic;
+        }
     }
     else {
 
         # Create a new session so that the contexts are correct. This is
         # really, really inefficient, but is essential to maintain correct
         # prefs if we don't have a modern Func
-        $oldSession = $Foswiki::Plugins::SESSION;
+        $old{SESSION} = $Foswiki::Plugins::SESSION;
         $Foswiki::Plugins::SESSION = new Foswiki( $this->{publisher}, $query );
     }
 
@@ -680,8 +702,18 @@ sub publishTopic {
 
     if ( defined &Foswiki::Func::popTopicContext ) {
         Foswiki::Func::popTopicContext( );
+        my $prefs = $Foswiki::Plugins::SESSION->{prefs};
+        if ($prefs && $prefs->can('setInternalPreferences')) {
+            $prefs->setInternalPreferences( %old );
+        } else {
+            foreach my $macro qw(BASEWEB BASETOPIC INCLUDINGWEB INCLUDINGTOPIC) {
+                $Foswiki::Plugins::SESSION->{SESSION_TAGS}{$macro} =
+                  $old{$macro};
+            }
+        }
+
     } else {
-        $Foswiki::Plugins::SESSION = $oldSession;    # restore session
+        $Foswiki::Plugins::SESSION = $old{SESSION};    # restore session
     }
 
     return $publishedRev;
@@ -711,7 +743,7 @@ sub _rewriteTemplateReferences {
 
     my $newLink =
         $Foswiki::cfg{PublishPlugin}{URL}
-      . $this->_dirForTemplate($template) . "/"
+      . $this->_dirForTemplate($template)
       . $this->{web} . '/'
       . $topic
       . _filetypeForTemplate($template);
@@ -727,7 +759,7 @@ sub _dirForTemplate {
     my ( $this, $template ) = @_;
     return '' if ( $template eq 'view' );
     return $template unless $this->{templateLocation};
-    return "$this->{templateLocation}/$template";
+    return "$this->{templateLocation}/$template/";
 }
 
 # SMELL this needs to be table driven
@@ -743,13 +775,13 @@ sub _filetypeForTemplate {
 #   * =$rsrcName= - name of resource (relative to pub/%WEB%)
 #   * =\%copied= - map of copied resources to new locations
 sub _copyResource {
-    my ( $this, $rsrcName, $copied ) = @_;
-
+    my ( $this, $srcName, $copied ) = @_;
+    my $rsrcName = $srcName;
     # Trim the resource name, as they can sometimes pick up whitespaces
     $rsrcName =~ /^\s*(.*?)\s*$/;
     $rsrcName = $1;
 
-    # SMELL WARNING
+    # SMELL WARNING (Martin Cleaver)
     # This is covers up a case such as where rsrcname comes through like
     # configtopic=PublishTestWeb/WebPreferences/favicon.ico
     # this should be just WebPreferences/favicon.ico
@@ -775,28 +807,34 @@ sub _copyResource {
 
         # Copy resource to rsrc directory.
         my $pubDir = Foswiki::Func::getPubDir();
+        my $src = "$pubDir/$rsrcName";
         if ( -r "$pubDir/$rsrcName" ) {
             $this->{archive}->addDirectory("rsrc");
             $this->{archive}->addDirectory("rsrc/$path");
-            $this->{archive}
-              ->addFile( "$pubDir/$rsrcName", "rsrc/$path/$file" );
+            my $dest = "rsrc/$path/$file";
+            $dest =~ s!//!/!g;
+            if ( -d $src) {
+                $this->{archive}->addDirectory( $src, $dest );
+            } else {
+                $this->{archive}->addFile( $src, $dest );
+            }
 
             # Record copy so we don't duplicate it later.
-            my $destURL = "rsrc/$path/$file";
-            $destURL =~ s!//!/!g;
-            $copied->{$rsrcName} = $destURL;
+            $copied->{$rsrcName} = $dest;
         }
         else {
-            $this->logError("$pubDir/$rsrcName is not readable");
+            $this->logError("$src is not readable");
         }
 
         # check css for additional resources, ie, url()
         if ( $rsrcName =~ /\.css$/ ) {
             my @moreResources = ();
-            if ( open( F, "$pubDir/$rsrcName" ) ) {
+            my $fh;
+            if ( open( $fh, '<', $src ) ) {
                 local $/;
-                my $data = <F>;
-                close(F);
+                binmode($fh);
+                my $data = <$fh>;
+                close($fh);
                 $data =~ s#\/\*.*?\*\/##gs;    # kill comments
                 foreach my $line ( split( /\r?\n/, $data ) ) {
                     if ( $line =~ /url\(["']?(.*?)["']?\)/ ) {
@@ -858,8 +896,6 @@ sub _topicURL {
 sub _handleURL {
     my ( $this, $src, $extras ) = @_;
 
-    return $src unless $src =~ m!^([a-z]+):([^/:]*)(:\d+)?(/.*)$!;
-
     my $data;
     if ( defined(&Foswiki::Func::getExternalResource) ) {
         my $response = Foswiki::Func::getExternalResource($src);
@@ -867,13 +903,22 @@ sub _handleURL {
         $data = $response->content();
     }
     else {
+        return $src unless $src =~ m!^([a-z]+)://([^/:]*)(:\d+)?(/.*)$!;
         my $protocol = $1;
         my $host     = $2;
-        my $port     = $3;
+        my $port     = $3 || 80;
         my $path     = $4;
-        $data =
-          $Foswiki::Plugins::SESSION->{net}
-          ->getUrl( $protocol, $host, $port, $path );
+die $src unless $host;
+        # Early getUrl didn't support protocol
+        if ($Foswiki::Plugins::SESSION->{net}->can('_getURLUsingLWP')) {
+            $data =
+              $Foswiki::Plugins::SESSION->{net}
+                ->getUrl( $protocol, $host, $port, $path );
+        } else {
+            $data =
+              $Foswiki::Plugins::SESSION->{net}
+                ->getUrl( $host, $port, $path );
+        }
     }
 
     # Note: no extension; rely on file format.

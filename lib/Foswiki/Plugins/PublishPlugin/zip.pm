@@ -18,16 +18,17 @@ package Foswiki::Plugins::PublishPlugin::zip;
 
 use strict;
 
+use Foswiki::Plugins::PublishPlugin::BackEnd;
+our @ISA = ( 'Foswiki::Plugins::PublishPlugin::BackEnd' );
+
 use Foswiki::Func;
 use File::Path;
 
 sub new {
-    my ( $class, $path, $web ) = @_;
-    my $this = bless( {}, $class );
-    $this->{path} = $path;
-    $this->{web}  = $web;
+    my $class = shift;
+    my $this = $class->SUPER::new(@_);
 
-    eval "use Archive::Zip qw( :ERROR_CODES :CONSTANTS )";
+    eval 'use Archive::Zip qw( :ERROR_CODES :CONSTANTS )';
     die $@ if $@;
     $this->{zip} = Archive::Zip->new();
 

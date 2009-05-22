@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2005 Crawford Currie, http://c-dot.co.uk
+# Copyright (C) 2005-2009 Crawford Currie, http://c-dot.co.uk
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -14,29 +14,25 @@
 #
 # Archive::Zip writer module for PublishPlugin
 #
+package Foswiki::Plugins::PublishPlugin::tgz;
+
 use strict;
 
-package Foswiki::Plugins::PublishPlugin::tgz;
+use Foswiki::Plugins::PublishPlugin::BackEnd;
+our @ISA = ( 'Foswiki::Plugins::PublishPlugin::BackEnd' );
 
 use Foswiki::Func;
 use File::Path;
+use Assert;
 
 sub new {
-    my ( $class, $path, $web ) = @_;
-    my $this = bless( {}, $class );
-    $this->{path} = $path;
-    $this->{web}  = $web;
+    my $class = shift;
+    my $this = $class->SUPER::new(@_);
 
-    eval "use Archive::Tar";
-    die $@ if $@;
+    require Archive::Tar;
     $this->{tar} = Archive::Tar->new();
 
     return $this;
-}
-
-sub addDirectory {
-
-    # Not needed
 }
 
 sub addString {
@@ -48,10 +44,13 @@ sub addString {
 
 sub addFile {
     my ( $this, $from, $to ) = @_;
-    local $/ = undef;
-    if ( open( R, "<$from" ) ) {
-        $this->addString( <R>, $to );
-        close(R);
+    my $fh;
+    if ( open( $fh, '<', $from ) ) {
+        local $/;
+        binmode($fh);
+        my $contents = <$fh>;
+        $this->addString( $contents, $to );
+        close($fh);
     }
     else {
         $this->{logger}->logError("Failed to open $from: $!");

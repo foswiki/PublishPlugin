@@ -15,16 +15,18 @@
 # PDF writer module for PublishPlugin
 #
 
-use strict;
-
 package Foswiki::Plugins::PublishPlugin::pdf;
-use base 'Foswiki::Plugins::PublishPlugin::file';
+
+use strict;
+use Foswiki::Plugins::PublishPlugin::file;
+our @ISA = ( 'Foswiki::Plugins::PublishPlugin::file' );
 
 use File::Path;
 
 sub new {
     my ( $class, $path, $web, $genopt, $logger, $query ) = @_;
-    return $class->SUPER::new( $path, "${web}_$$", $genopt, $logger, $query );
+    my $t = Foswiki::Time::formatTime(time, '$year$mo$day$hours$minutes$seconds', 'gmtime');
+    return $class->SUPER::new( $path, "${web}_$t", $genopt, $logger, $query );
 }
 
 sub close {

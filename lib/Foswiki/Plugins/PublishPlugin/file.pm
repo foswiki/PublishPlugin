@@ -18,26 +18,24 @@ package Foswiki::Plugins::PublishPlugin::file;
 
 use strict;
 
+use Foswiki::Plugins::PublishPlugin::BackEnd;
+our @ISA = ( 'Foswiki::Plugins::PublishPlugin::BackEnd' );
+
 use File::Copy;
 use File::Path;
 
 sub new {
-    my ( $class, $path, $web, $genopt, $logger, $query ) = @_;
-    my $this = bless( {}, $class );
-    $this->{path}   = $path;
-    $this->{web}    = $web;
-    $this->{genopt} = $genopt;
-    $this->{logger} = $logger;
+    my $class = shift;
+    my $this = $class->SUPER::new(@_);
 
     foreach my $param qw(defaultpage googlefile relativeurl) {
-        my $p = $query->param($param);
-        die $param unless defined $p;
+        my $p = $this->{query}->param($param);
+        die "'$param' query parameter missing" unless defined $p;
         $p =~ /^(.*)$/;
         $this->{$param} = $1;
-        $query->delete($param);
     }
 
-    File::Path::mkpath("$this->{path}/$web");
+    File::Path::mkpath("$this->{path}$this->{web}");
 
     return $this;
 }
@@ -54,9 +52,11 @@ sub addString {
     my ( $this, $string, $file ) = @_;
 
     my $f = "$this->{web}/$file";
-    if ( open( F, ">$this->{path}/$f" ) ) {
-        print F $string;
-        close(F);
+    my $fh;
+    if ( open( $fh, '>', "$this->{path}/$f" ) ) {
+        binmode($fh);
+        print $fh $string;
+        close($fh);
         push( @{ $this->{files} }, $f );
     }
     else {
