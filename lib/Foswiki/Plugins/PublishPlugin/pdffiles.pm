@@ -27,9 +27,9 @@ my $debug = 1;
   Foswiki::Plugins::PublishPlugin::PDFWriter);
 
 sub new {
-    my ( $class, $path, $web, $genopt ) = @_;
+    my ( $class, $path, $web, $extras ) = @_;
     my $this = bless( $class->SUPER::new( $path, "${web}_$$" ), $class );
-    $this->{genopt} = $genopt;
+    $this->{extras} = $extras;
     return $this;
 }
 

@@ -38,12 +38,12 @@ Construct a new back end.
 =cut
 
 sub new {
-    my ( $class, $path, $web, $genopt, $logger, $query ) = @_;
+    my ( $class, $path, $web, $extras, $logger, $query ) = @_;
     $path .= '/' unless $path =~ m#/$#;
     my $this = bless( {
         path   => $path,
         web    => $web,
-        genopt => $genopt,
+        extras => $extras,
         logger => $logger,
         query  => $query,
     }, $class );

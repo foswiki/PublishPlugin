@@ -32,8 +32,8 @@ use File::Temp qw(:seekable);
 use File::Spec;
 
 sub new {
-    my ( $class, $path, $web, $genopt, $logger, $query ) = @_;
-    my $this = $class->SUPER::new( $path, $web, $genopt, $logger, $query );
+    my ( $class, $path, $web, $extras, $logger, $query ) = @_;
+    my $this = $class->SUPER::new( $path, $web, $extras, $logger, $query );
 
     foreach my $param qw(destinationftpserver
       destinationftppath destinationftpusername

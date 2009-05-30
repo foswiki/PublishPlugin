@@ -908,7 +908,6 @@ sub _handleURL {
         my $host     = $2;
         my $port     = $3 || 80;
         my $path     = $4;
-die $src unless $host;
         # Early getUrl didn't support protocol
         if ($Foswiki::Plugins::SESSION->{net}->can('_getURLUsingLWP')) {
             $data =

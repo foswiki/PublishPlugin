@@ -29,8 +29,7 @@ sub new {
     my $this = $class->SUPER::new(@_);
 
     foreach my $param qw(defaultpage googlefile relativeurl) {
-        my $p = $this->{query}->param($param);
-        die "'$param' query parameter missing" unless defined $p;
+        my $p = $this->{query}->param($param) || '';
         $p =~ /^(.*)$/;
         $this->{$param} = $1;
     }
@@ -124,9 +123,6 @@ HERE
 
     my $topicTemplatePre  = "<url>\n<loc>";
     my $topicTemplatePost = "</loc>\n</url>";
-
-    die "relativeurl param not defined"
-      unless ( defined( $this->{relativeurl} ) );
 
     my $urls = join(
         "\n",

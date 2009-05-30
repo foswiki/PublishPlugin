@@ -24,9 +24,9 @@ our @ISA = ( 'Foswiki::Plugins::PublishPlugin::file' );
 use File::Path;
 
 sub new {
-    my ( $class, $path, $web, $genopt, $logger, $query ) = @_;
+    my ( $class, $path, $web, $extras, $logger, $query ) = @_;
     my $t = Foswiki::Time::formatTime(time, '$year$mo$day$hours$minutes$seconds', 'gmtime');
-    return $class->SUPER::new( $path, "${web}_$t", $genopt, $logger, $query );
+    return $class->SUPER::new( $path, "${web}_$t", $extras, $logger, $query );
 }
 
 sub close {
@@ -45,7 +45,7 @@ sub close {
     die "{PublishPlugin}{PDFCmd} not defined" unless $cmd;
 
     my $landed = "$this->{web}.pdf";
-    my @extras = split( /\s+/, $this->{genopt} || '' );
+    my @extras = split( /\s+/, $this->{extras} || '' );
 
     $ENV{HTMLDOC_DEBUG} = 1;    # see man htmldoc - goes to apache err log
     $ENV{HTMLDOC_NOCGI} = 1;    # see man htmldoc
