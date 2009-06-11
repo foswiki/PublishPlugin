@@ -419,7 +419,7 @@ Note that =htmldoc= can also be used to generate !PostScript by using the =-t= o
 ---++++ =.zip= output
    1 Install Archive::Zip and everything it depends on
 
-<p><string>WARNING!</strong> Anything published is no longer under the
+*WARNING!* Anything published is no longer under the
 control of Foswiki access controls, and if you make the publish output
 directory visible on the web then you may need to
 take precautions to prevent accidental leakage of confidential information

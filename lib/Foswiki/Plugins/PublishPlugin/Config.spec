@@ -7,7 +7,7 @@
 $Foswiki::cfg{PublishPlugin}{Dir} = '$Foswiki::cfg{PubDir}/publish/';
 # **URL**
 # URL path of the directory you defined above.
-# <p><string>WARNING!</strong> Anything published is no longer under the
+# <p><strong>WARNING!</strong> Anything published is no longer under the
 # control of Foswiki access controls, and anyone who has access to the
 # published file can see the contents of the web. You may need to
 # take precautions to prevent accidental leakage of confidential information
