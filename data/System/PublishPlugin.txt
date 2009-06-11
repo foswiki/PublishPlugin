@@ -419,6 +419,13 @@ Note that =htmldoc= can also be used to generate !PostScript by using the =-t= o
 ---++++ =.zip= output
    1 Install Archive::Zip and everything it depends on
 
+<p><string>WARNING!</strong> Anything published is no longer under the
+control of Foswiki access controls, and if you make the publish output
+directory visible on the web then you may need to
+take precautions to prevent accidental leakage of confidential information
+by restricting web access to this directory, for example in the Apache
+configuration.
+
 ---++ Info
 This add-on started life as the !GenHTMLAddon, written by Foswiki:Main/CrawfordCurrie at Motorola. It was then extended by Eric Scouten, and then further fixed and enhanced by Foswiki:Main/CrawfordCurrie (http://c-dot.co.uk). It has also been extended by Foswiki:Main/SvenDowideit and Foswiki:Main/MartinCleaver, and most recently refactored for Foswiki by Foswiki:Main/CrawfordCurrie.
 
