@@ -29,5 +29,5 @@ To use it, take a copy of the raw text of this topic, and paste it into a new to
 <input type="hidden" name="topic" value="%WEB%.%TOPIC%" />
 <input type="hidden" name="configtopic" value="%WEB%.%TOPIC%" />
 <input type="hidden" name="ping" value="%SERVERTIME%" />
-<input type="submit" class="twikiSubmit" value="Publish using this topic" />
+<input type="submit" class="foswikiSubmit" value="Publish using this topic" />
 </form>

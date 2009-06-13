@@ -87,7 +87,7 @@ sub _publishControlCentre {
 
     # Check access to this interface!
     if ( defined &Foswiki::Func::isAnAdmin && !Foswiki::Func::isAnAdmin() ) {
-        return CGI::span( { class => 'twikiAlert' },
+        return CGI::span( { class => 'foswikiAlert' },
             "Only admins can access the control interface" );
     }
     # Old code doesn't have isAnAdmin so will allow access to
