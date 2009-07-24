@@ -267,9 +267,6 @@ TEXT
         $disabledPlugins .= ', ' . $plugin unless ($enable);
     }
 
-    $Foswiki::cfg{PublishPlugin}{URL} .= '/'
-      unless $Foswiki::cfg{PublishPlugin}{URL} =~ m#/$#;
-
     $this->logInfo( "Publisher",         $this->{publisher} );
     $this->logInfo( "Date",              Foswiki::Func::formatTime( time() ) );
     $this->logInfo( "Dir",               "$Foswiki::cfg{PublishPlugin}{Dir}$this->{relativedir}" );
@@ -551,17 +548,10 @@ sub publishTopic {
     if ( defined &Foswiki::Func::pushTopicContext ) {
         # SMELL: Have to hack into the core to set internal preferences :-(
         foreach my $macro qw(BASEWEB BASETOPIC INCLUDINGWEB INCLUDINGTOPIC) {
-            $old{$macro} = Foswiki::Func::getPreferencesValue($macro);
-        }
+              $old{$macro} = Foswiki::Func::getPreferencesValue($macro);
+          }
         Foswiki::Func::pushTopicContext( $this->{web}, $topic );
-        my $prefs = $Foswiki::Plugins::SESSION->{prefs};
-        if ($prefs && $prefs->can('setInternalPreferences')) {
-            $prefs->setInternalPreferences(
-                BASEWEB => $this->{web},
-                BASETOPIC => $topic,
-                INCLUDINGWEB => $this->{web},
-                INCLUDINGTOPIC => $topic);
-        } else {
+        if (defined $Foswiki::Plugins::SESSION->{SESSION_TAGS}) {
             my $stags = $Foswiki::Plugins::SESSION->{SESSION_TAGS};
             $stags->{BASEWEB} = $this->{web};
             $stags->{BASETOPIC} = $topic;
@@ -702,10 +692,7 @@ sub publishTopic {
 
     if ( defined &Foswiki::Func::popTopicContext ) {
         Foswiki::Func::popTopicContext( );
-        my $prefs = $Foswiki::Plugins::SESSION->{prefs};
-        if ($prefs && $prefs->can('setInternalPreferences')) {
-            $prefs->setInternalPreferences( %old );
-        } else {
+        if (defined $Foswiki::Plugins::SESSION->{SESSION_TAGS}) {
             foreach my $macro qw(BASEWEB BASETOPIC INCLUDINGWEB INCLUDINGTOPIC) {
                 $Foswiki::Plugins::SESSION->{SESSION_TAGS}{$macro} =
                   $old{$macro};

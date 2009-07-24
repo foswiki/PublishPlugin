@@ -51,6 +51,11 @@ sub _publishRESTHandler {
     my $publisher = new Foswiki::Plugins::PublishPlugin::Publisher(
         $Foswiki::Plugins::SESSION);
 
+    $Foswiki::cfg{PublishPlugin}{Dir} .= '/'
+      unless $Foswiki::cfg{PublishPlugin}{Dir} =~ m#/$#;
+    $Foswiki::cfg{PublishPlugin}{URL} .= '/'
+      unless $Foswiki::cfg{PublishPlugin}{URL} =~ m#/$#;
+
     my $query = Foswiki::Func::getCgiQuery();
     if ( defined $query->param('control') ) {
 
