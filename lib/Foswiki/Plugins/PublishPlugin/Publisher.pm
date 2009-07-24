@@ -546,12 +546,17 @@ sub publishTopic {
     $query->param( 'topic', "$this->{web}.$topic" );
 
     if ( defined &Foswiki::Func::pushTopicContext ) {
-        # SMELL: Have to hack into the core to set internal preferences :-(
-        foreach my $macro qw(BASEWEB BASETOPIC INCLUDINGWEB INCLUDINGTOPIC) {
-              $old{$macro} = Foswiki::Func::getPreferencesValue($macro);
-          }
+        # In 1.0.6 and earlier, have to handle some session tags ourselves
+        # because pushTopicContext doesn't do it. **
+        if (defined $Foswiki::Plugins::SESSION->{SESSION_TAGS}) {
+            foreach my $macro qw(BASEWEB BASETOPIC
+                                 INCLUDINGWEB INCLUDINGTOPIC) {
+                $old{$macro} = Foswiki::Func::getPreferencesValue($macro);
+            }
+        }
         Foswiki::Func::pushTopicContext( $this->{web}, $topic );
         if (defined $Foswiki::Plugins::SESSION->{SESSION_TAGS}) {
+            # see ** above
             my $stags = $Foswiki::Plugins::SESSION->{SESSION_TAGS};
             $stags->{BASEWEB} = $this->{web};
             $stags->{BASETOPIC} = $topic;
@@ -693,7 +698,10 @@ sub publishTopic {
     if ( defined &Foswiki::Func::popTopicContext ) {
         Foswiki::Func::popTopicContext( );
         if (defined $Foswiki::Plugins::SESSION->{SESSION_TAGS}) {
-            foreach my $macro qw(BASEWEB BASETOPIC INCLUDINGWEB INCLUDINGTOPIC) {
+            # In 1.0.6 and earlier, have to handle some session tags ourselves
+            # because pushTopicContext doesn't do it. **
+            foreach my $macro qw(BASEWEB BASETOPIC
+                                 INCLUDINGWEB INCLUDINGTOPIC) {
                 $Foswiki::Plugins::SESSION->{SESSION_TAGS}{$macro} =
                   $old{$macro};
             }
