@@ -102,6 +102,9 @@ sub new {
             # this records which templates (e.g. view, viewprint, viuehandheld,
             # etc) have been referred to and thus should be generated.
             templatesReferenced => {},
+
+            # serial number for giving unique names to external resources
+            nextExternalResourceNumber => 0,
         },
         $class
     );
@@ -684,11 +687,9 @@ sub publishTopic {
     $tmpl =~ s!href=["'](.*?)\?template=(\w*)(.*?)["']!
       $this->_rewriteTemplateReferences($tmpl, $1, $2, $3)!e;
 
-    my $extras = 0;
-
     # Handle image tags using absolute URLs not otherwise satisfied
     $tmpl =~ s!(<img\s+.*?\bsrc=)(["'])(.*?)\2(.*?>)!
-      $1.$2.$this->_handleURL($3,\$extras).$2.$4!ge;
+      $1.$2.$this->_handleURL($3,\($this->{nextExternalResourceNumber})).$2.$4!ge;
 
     $tmpl =~ s/<nop>//g;
 
