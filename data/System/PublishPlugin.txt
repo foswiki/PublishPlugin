@@ -212,7 +212,7 @@ padding:.5em;
      Google file
     </td>
     <td>
-     <input type="text" size="40" name="googlefile" value="" /><br />
+     <input type="text" size="40" name="googlefile" value="" class="foswikiInputField" /><br />
      generates the =HTML verification file= needed to verify your site claim.
      see <a href="http://www.google.com/webmasters/sitemaps/">Google webmaster tools</a> 
     </td>
@@ -225,7 +225,7 @@ padding:.5em;
      Default topic:
     </td>
     <td>
-     <input type="text" size="40" name="defaultpage" value="WebHome" /><br />
+     <input type="text" size="40" name="defaultpage" value="WebHome" class="foswikiInputField" /><br />
      Name of topic to used to generate default.htm, index.html
     </td>
     <td>
@@ -237,7 +237,7 @@ padding:.5em;
      Relative directory:
     </td>
     <td>
-     <input type="text" size="40" name="relativedir" value="/" /><br />
+     <input type="text" size="40" name="relativedir" value="/" class="foswikiInputField" /><br />
      Path of a directory relative to ={PublishPlugin}{Dir}= where you want
      the output generated. '/' means generate the output directly in
      ={PublishPlugin}{Dir}=.
@@ -251,7 +251,7 @@ padding:.5em;
      Relative URL used in sitemap
     </td>
     <td>
-     <input type="text" size="40" name="relativeurl" value="/" /><br />
+     <input type="text" size="40" name="relativeurl" value="/" class="foswikiInputField" /><br />
      the base URL that your published Foswiki topics will reside at (if you
      are publishing to the root of your site, =/= is correct)
      see <a href="http://www.google.com/webmasters/sitemaps/">Google
@@ -276,7 +276,7 @@ padding:.5em;
      Destination FTP server
     </td>
     <td>
-     <input type="text" size="40" name="destinationftpserver" value="" /><br />
+     <input type="text" size="40" name="destinationftpserver" value="" class="foswikiInputField" /><br />
      Set to blank to proof the output prior to uploading to your site.
     </td>
     <td>
@@ -288,7 +288,7 @@ padding:.5em;
      Path to upload to on server
     </td>
     <td>
-     <input type="text" size="40" name="destinationftppath" value="" />
+     <input type="text" size="40" name="destinationftppath" value="" class="foswikiInputField" />
     </td>
     <td>
      =destinationftppath=
@@ -299,7 +299,7 @@ padding:.5em;
      FTP username
     </td>
     <td>
-     <input type="text" size="40" name="destinationftpusername" value="" />
+     <input type="text" size="40" name="destinationftpusername" value="" class="foswikiInputField" />
     </td>
     <td>
      =destinationftpusername=
@@ -310,7 +310,7 @@ padding:.5em;
      FTP Password
     </td>
     <td>
-     <input type="password" size="40" name="destinationftppassword" value="" />
+     <input type="password" size="40" name="destinationftppassword" value="" class="foswikiInputField" />
     </td>
     <td>
      =destinationftppassword=
@@ -318,7 +318,7 @@ padding:.5em;
    </tr>
    <tr>
     <td valign="top">Fast publish</td>
-    <td> <input type="checkbox" name="fastupload" checked="checked" /> <br />
+    <td> <input type="checkbox" name="fastupload" checked="checked" class="foswikiCheckbox" /> <br />
     Speed up the ftp publishing by only uploading modified files. This will
     store a (tiny) checksum (.md5) file on the server alongside each uploaded
     file which will be used to optimise future uploads. Recommended.
@@ -433,7 +433,9 @@ This add-on started life as the !GenHTMLAddon, written by Foswiki:Main/CrawfordC
 |  Dependencies: | %$DEPENDENCIES% |
 |  License: | GPL |
 |  Version: | %$VERSION% |
+|  Release: | %$RELEASE% |
 |  Change History: | |
+|  10 Jan 2010 | Foswikitask:Item2615: fixed finding resources not inside quotes |
 |  30 May 2009 | Foswikitask:Item8168: fixed genopt (extras) |
 |  22 May 2009 | Foswikitask:Item8165: fixed missing BASEWEB and other internal preferences. This was resulting in the wrong web being used for some operations |
 |  16 May 2009 | Foswikitask:Item1626: fixed META{"formfield" Foswikitask:Item8150: (Marc Schaefer) fix for -skin parameter Foswikitask:Item1557: doc fix Foswikitask:Item1585: allow history topic in different web Foswikitask:Item871: add missing newline at start of topic text. Foswikitask:Item1449: topic publisher was not popping the context correctly Foswikitask:Item1632: improve backporting support |

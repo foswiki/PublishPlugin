@@ -663,7 +663,7 @@ sub publishTopic {
 
     # Find and copy resources attached to the topic
     my $pub = Foswiki::Func::getPubUrlPath();
-    $tmpl =~ s!(['"])($Foswiki::cfg{DefaultUrlHost}|https?://$hs)?$pub/(.*?)\1!
+    $tmpl =~ s!(['"\(])($Foswiki::cfg{DefaultUrlHost}|https?://$hs)?$pub/(.*?)(['"\)])!
       $1.$this->_copyResource($3, $copied).$1!ge;
 
     my $ilt;
