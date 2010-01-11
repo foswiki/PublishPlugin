@@ -435,7 +435,7 @@ This add-on started life as the !GenHTMLAddon, written by Foswiki:Main/CrawfordC
 |  Version: | %$VERSION% |
 |  Release: | %$RELEASE% |
 |  Change History: | |
-|  10 Jan 2010 | Foswikitask:Item2615: fixed finding resources not inside quotes |
+|  11 Jan 2010 | Foswikitask:Item2615: fixed finding resources not inside quotes |
 |  30 May 2009 | Foswikitask:Item8168: fixed genopt (extras) |
 |  22 May 2009 | Foswikitask:Item8165: fixed missing BASEWEB and other internal preferences. This was resulting in the wrong web being used for some operations |
 |  16 May 2009 | Foswikitask:Item1626: fixed META{"formfield" Foswikitask:Item8150: (Marc Schaefer) fix for -skin parameter Foswikitask:Item1557: doc fix Foswikitask:Item1585: allow history topic in different web Foswikitask:Item871: add missing newline at start of topic text. Foswikitask:Item1449: topic publisher was not popping the context correctly Foswikitask:Item1632: improve backporting support |
