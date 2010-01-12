@@ -635,8 +635,14 @@ sub publishTopic {
     # simulate the way the view script splits up the topic and reassembles
     # it around newlines.
     $text = "\n$text" unless $text =~ /^\n/s;
-    $tmpl =~ s/%TEXT%/$text/g;
-
+    
+    # add items ADDTOHEAD
+    # only parse the head section
+    my ( $header, $footer ) = split( /%TEXT%/, $tmpl );
+    my $addedToHead = $Foswiki::Plugins::SESSION->RENDERHEAD();
+    $header =~ s/(<\/head>)/$addedToHead$1/;
+    $tmpl = $header . $text . $footer;
+    
     # legacy
     $tmpl =~ s/<nopublish>.*?<\/nopublish>//gs;
 
@@ -644,6 +650,11 @@ sub publishTopic {
     $tmpl =~ s/%MAXREV%/$maxrev/g;
     $tmpl =~ s/%CURRREV%/$maxrev/g;
     $tmpl =~ s/%REVTITLE%//g;
+
+    # trim spaces at start and end    
+    $tmpl =~ s/^[[:space:]]+//s;    # trim at start
+    $tmpl =~ s/[[:space:]]+$//s;    # trim at end
+
     $tmpl = Foswiki::Func::renderText( $tmpl, $this->{web} );
 
     $tmpl =~ s|( ?) *</*nop/*>\n?|$1|gois;
@@ -943,6 +954,7 @@ __END__
 # Copyright (C) 2002, Eric Scouten
 # Copyright (C) 2005-2008 Crawford Currie, http://c-dot.co.uk
 # Copyright (C) 2006 Martin Cleaver, http://www.cleaver.org
+# Copyright (C) 2010 Arthur Clemens, http://visiblearea.com
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License

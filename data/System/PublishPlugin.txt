@@ -429,12 +429,13 @@ configuration.
 ---++ Info
 This add-on started life as the !GenHTMLAddon, written by Foswiki:Main/CrawfordCurrie at Motorola. It was then extended by Eric Scouten, and then further fixed and enhanced by Foswiki:Main/CrawfordCurrie (http://c-dot.co.uk). It has also been extended by Foswiki:Main/SvenDowideit and Foswiki:Main/MartinCleaver, and most recently refactored for Foswiki by Foswiki:Main/CrawfordCurrie.
 
-|  Authors: | Foswiki:Main/CrawfordCurrie, Eric Scouten, Foswiki:Main.SvenDowideit, Foswiki:Main.MartinCleaver|
+|  Authors: | Foswiki:Main/CrawfordCurrie, Eric Scouten, Foswiki:Main.SvenDowideit, Foswiki:Main.MartinCleaver, Foswiki:Main.ArthurClemens |
 |  Dependencies: | %$DEPENDENCIES% |
 |  License: | GPL |
 |  Version: | %$VERSION% |
 |  Release: | %$RELEASE% |
 |  Change History: | |
+|  12 Jan 2010 | Foswikitask:Item2557: fixed publish head elements added by ADDTOHEAD |
 |  11 Jan 2010 | Foswikitask:Item2615: fixed finding resources not inside quotes |
 |  30 May 2009 | Foswikitask:Item8168: fixed genopt (extras) |
 |  22 May 2009 | Foswikitask:Item8165: fixed missing BASEWEB and other internal preferences. This was resulting in the wrong web being used for some operations |
