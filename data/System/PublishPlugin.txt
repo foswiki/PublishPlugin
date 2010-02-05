@@ -378,7 +378,7 @@ table.publishForm .paramCol {
 			=destinationftpusername=
 		</td>
 	</tr>
-	<tr>
+	<tr class="publishOptionsSet ftpOptions">
 		<td class="nameCol">
 			Password
 		</td>
@@ -392,7 +392,7 @@ table.publishForm .paramCol {
 			=destinationftppassword=
 		</td>
 	</tr>
-	<tr>
+	<tr class="publishOptionsSet ftpOptions">
 		<td class="nameCol">
 			Fast publish
 		</td>
