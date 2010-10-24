@@ -7,6 +7,16 @@ use Foswiki;
 use Foswiki::Func;
 use Error ':try';
 use Assert;
+use Foswiki::Plugins::PublishPlugin::PageAssembler;
+
+sub CHECKLEAK {0}
+BEGIN {
+    if (CHECKLEAK) {
+        eval "use Devel::Leak::Object qw{ GLOBAL_bless };";
+        die $@ if $@;
+        $Devel::Leak::Object::TRACKSOURCELINES = 1;
+    }
+}
 
 my %parameters = (
     history          => { default => 'PublishPluginHistory',
@@ -263,7 +273,7 @@ TEXT
         next unless ref( $Foswiki::cfg{Plugins}{$plugin} ) eq 'HASH';
         my $enable = $Foswiki::cfg{Plugins}{$plugin}{Enabled};
         if ( scalar(@pluginsToEnable) > 0 ) {
-            $enable = grep( /$plugin/, @pluginsToEnable );
+            $enable = grep( /\b$plugin\b/, @pluginsToEnable );
             $Foswiki::cfg{Plugins}{$plugin}{Enabled} = $enable;
         }
         $enabledPlugins .= ', ' . $plugin if ($enable);
@@ -357,6 +367,7 @@ ERROR
         $this->logInfo( "Published To", <<LINK);
 <a href="$Foswiki::cfg{PublishPlugin}{URL}$this->{relativedir}$landed">$landed</a>
 LINK
+        Devel::Leak::Object::checkpoint() if CHECKLEAK;
     }
 
     # check the templates referenced, and that everything referenced
@@ -500,6 +511,29 @@ sub publishUsingTemplate {
             my $e = shift;
             $this->logError( "$topic not published: " . ( $e->{-text} || '' ) );
         };
+
+        # Prevent slowdown and unnecessary memory use if templates are 
+        # frequently reloaded, for some 1.1.x versions of Foswiki.
+        # This is NOT a likely condition, and it is only known to manifest
+        # when there are additional problems in the data being published.
+        # However, if there is something wrong in the publishing configuration,
+        # then it is possible for many pages to have at least one inline alert,
+        # and Foswiki::inlineAlert reloads its template each time it is called
+        # (at least, it does for some versions of Foswiki).
+        # This can be problem when publishing several hundred topics.
+        # Sure - the publishing configuration should be fixed,
+        # but it can be tricky to debug that configuration if Apache is
+        # killing the publishing process.
+        if ($Foswiki::Plugins::SESSION->can('templates') and
+            $Foswiki::Plugins::SESSION->{templates} and
+            ref $Foswiki::Plugins::SESSION->{templates} and
+            $Foswiki::Plugins::SESSION->{templates}->can('finish') )
+        {
+            $Foswiki::Plugins::SESSION->{templates}->finish();
+            undef $Foswiki::Plugins::SESSION->{templates};
+        }
+
+        Devel::Leak::Object::checkpoint() if CHECKLEAK;
     }
 }
 
@@ -636,12 +670,7 @@ sub publishTopic {
     # it around newlines.
     $text = "\n$text" unless $text =~ /^\n/s;
     
-    # add items ADDTOHEAD
-    # only parse the head section
-    my ( $header, $footer ) = split( /%TEXT%/, $tmpl );
-    my $addedToHead = $Foswiki::Plugins::SESSION->RENDERHEAD();
-    $header =~ s/(<\/head>)/$addedToHead$1/;
-    $tmpl = $header . $text . $footer;
+    $tmpl = Foswiki::Plugins::PublishPlugin::PageAssembler::assemblePage($this, $tmpl, $text);
     
     # legacy
     $tmpl =~ s/<nopublish>.*?<\/nopublish>//gs;
@@ -656,6 +685,15 @@ sub publishTopic {
     $tmpl =~ s/[[:space:]]+$//s;    # trim at end
 
     $tmpl = Foswiki::Func::renderText( $tmpl, $this->{web} );
+
+    if ($Foswiki::Plugins::VERSION and $Foswiki::Plugins::VERSION >= 2.0)
+    {
+        # Note: Foswiki 1.1 supplies this same header text 
+        # when dispatching completePageHandler.
+        my $CRLF   = "\x0D\x0A";
+        my $hdr = "Content-type: text/html$CRLF$CRLF";
+        $Foswiki::Plugins::SESSION->{plugins}->dispatch( 'completePageHandler', $tmpl, $hdr );
+    }
 
     $tmpl =~ s|( ?) *</*nop/*>\n?|$1|gois;
 
@@ -802,20 +840,24 @@ sub _copyResource {
     # See if we've already copied this resource.
     unless ( exists $copied->{$rsrcName} ) {
 
+        # strip off things like ?version=wossname arguments appended to .js
+        my $bareRsrcName = $rsrcName;
+        $bareRsrcName =~ s/\?.*//o; 
+
         # Nope, it's new. Gotta copy it to new location.
         # Split resource name into path (relative to pub/%WEB%) and leaf name.
-        my $file = $rsrcName;
+        my $file = $bareRsrcName;
         $file =~ s(^(.*)\/)()o;
         my $path = "";
-        if ( $rsrcName =~ "/" ) {
-            $path = $rsrcName;
+        if ( $bareRsrcName =~ "/" ) {
+            $path = $bareRsrcName;
             $path =~ s(\/[^\/]*$)()o;    # path, excluding the basename
         }
 
         # Copy resource to rsrc directory.
         my $pubDir = Foswiki::Func::getPubDir();
-        my $src = "$pubDir/$rsrcName";
-        if ( -r "$pubDir/$rsrcName" ) {
+        my $src = "$pubDir/$bareRsrcName";
+        if ( -r "$pubDir/$bareRsrcName" ) {
             $this->{archive}->addDirectory("rsrc");
             $this->{archive}->addDirectory("rsrc/$path");
             my $dest = "rsrc/$path/$file";
@@ -834,7 +876,7 @@ sub _copyResource {
         }
 
         # check css for additional resources, ie, url()
-        if ( $rsrcName =~ /\.css$/ ) {
+        if ( $bareRsrcName =~ /\.css$/ ) {
             my @moreResources = ();
             my $fh;
             if ( open( $fh, '<', $src ) ) {
@@ -955,6 +997,7 @@ __END__
 # Copyright (C) 2005-2008 Crawford Currie, http://c-dot.co.uk
 # Copyright (C) 2006 Martin Cleaver, http://www.cleaver.org
 # Copyright (C) 2010 Arthur Clemens, http://visiblearea.com
+# Copyright (C) 2010 Michael Tempest
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
