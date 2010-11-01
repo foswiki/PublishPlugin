@@ -11,7 +11,7 @@ use Error qw( :try );
 use strict;
 
 our $VERSION = '$Rev$';
-our $RELEASE = '29 Oct 2010';
+our $RELEASE = '01 Nov 2010';
 our $SHORTDESCRIPTION =
 'Generate static output (HTML, PDF) optionally upload (FTP) the output to a publishing site.';
 

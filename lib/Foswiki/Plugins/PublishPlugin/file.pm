@@ -21,8 +21,8 @@ use strict;
 use Foswiki::Plugins::PublishPlugin::BackEnd;
 our @ISA = ( 'Foswiki::Plugins::PublishPlugin::BackEnd' );
 
-use File::Copy;
-use File::Path;
+use File::Copy ();
+use File::Path ();
 
 sub new {
     my $class = shift;
@@ -34,7 +34,10 @@ sub new {
         $this->{$param} = $1;
     }
 
-    File::Path::mkpath("$this->{path}$this->{web}");
+    my $oldmask = umask( oct(777) - $Foswiki::cfg{RCS}{dirPermission} );
+    eval { File::Path::mkpath("$this->{path}$this->{web}"); };
+    umask( $oldmask );
+    die $@ if $@;
 
     return $this;
 }
@@ -42,8 +45,10 @@ sub new {
 sub addDirectory {
     my ( $this, $name ) = @_;
     my $d = "$this->{web}/$name";
-    eval { File::Path::mkpath("$this->{path}/$d") };
+    my $oldmask = umask( oct(777) - $Foswiki::cfg{RCS}{dirPermission} );
+    eval { File::Path::mkpath("$this->{path}$d") };
     $this->{logger}->logError($@) if $@;
+    umask( $oldmask );
     push( @{ $this->{dirs} }, $d );
 }
 
@@ -52,7 +57,7 @@ sub addString {
 
     my $f = "$this->{web}/$file";
     my $fh;
-    if ( open( $fh, '>', "$this->{path}/$f" ) ) {
+    if ( open( $fh, '>', "$this->{path}$f" ) ) {
         binmode($fh);
         print $fh $string;
         close($fh);
@@ -70,7 +75,7 @@ sub addString {
         if ( $this->{defaultpage} && $topic eq $this->{defaultpage} ) {
             $this->addString( $string, 'default.htm' );
             $this->addString( $string, 'index.html' );
-            print '(default.htm, index.html)';
+            $this->{logger}->logInfo($topic, '(default.htm, index.html)');
         }
     }
 }
@@ -78,9 +83,9 @@ sub addString {
 sub addFile {
     my ( $this, $from, $to ) = @_;
     my $f    = "$this->{web}/$to";
-    my $dest = "$this->{path}/$f";
-    eval { File::Copy::copy( $from, $dest ); };
-    $this->{logger}->logError($@) if $@;
+    my $dest = "$this->{path}$f";
+    File::Copy::copy( $from, $dest )
+      or $this->{logger}->logError("Cannot copy $from to $dest: $!");
     my @stat = stat($from);
     $this->{logger}->logError("Unable to stat $from") unless @stat;
     utime( @stat[ 8, 9 ], $dest );
@@ -93,7 +98,7 @@ sub close {
     # write sitemap.xml
     my $sitemap = $this->_createSitemap( \@{ $this->{urls} } );
     $this->addString( $sitemap, 'sitemap.xml' );
-    print 'Published sitemap.xml<br />';
+    $this->{logger}->logInfo('', 'Published sitemap.xml');
 
     # write google verification files (comma seperated list)
     if ( $this->{googlefile} ) {
@@ -104,7 +109,7 @@ sub close {
               . $file
               . '</title><body>just for google</body></html>';
             $this->addString( $simplehtml, $file );
-            print 'Published googlefile : ' . $file . '<br />';
+            $this->{logger}->logInfo('', 'Published googlefile : ' . $file);
         }
     }
 

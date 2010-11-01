@@ -55,7 +55,7 @@ sub new {
         if ( $this->{destinationftppath} =~ /^\/?(.*)$/ ) {
             $this->{destinationftppath} = $1;
         }
-        print "fastUpload = $this->{fastupload}<br />";
+        $this->{logger}->logInfo('', "fastUpload = $this->{fastupload}");
     }
 
     return $this;
@@ -119,8 +119,7 @@ sub _upload {
                 if ( $localCS eq $remoteCS ) {
 
                     # Unchanged
-                    print
-"skipped uploading $to to $this->{destinationftpserver} (no changes) <br />";
+                    $this->{logger}->logInfo('', "skipped uploading $to to $this->{destinationftpserver} (no changes)");
                     $attempts = 2;
                     return;
                 }
@@ -139,7 +138,7 @@ sub _upload {
 
             $ftp->put( $localfilePath, $to )
               or die "put failed ", $ftp->message;
-            print "<b>FTPed</b> $to to $this->{destinationftpserver} <br />";
+            $this->{logger}->logInfo("FTPed","$to to $this->{destinationftpserver}");
             $attempts = 2;
         };
 
@@ -147,12 +146,12 @@ sub _upload {
 
             # Got an error; try restarting the session a couple of times
             # before giving up
-            print "<font color='red'>FTP ERROR: " . $@ . "</font><br>";
+            $this->{logger}->logError("FTP ERROR: " . $@);
             if ( ++$attempts == 2 ) {
-                print "<font color='red'>Giving up on $to</font><br>\n";
+                $this->{logger}->logError("Giving up on $to");
                 return;
             }
-            print "...retrying in 30s<br>\n";
+            $this->{logger}->logInfo('', "...retrying in 30s)");
             eval { $ftp->quit(); };
             $this->{ftp_interface} = undef;
             sleep(30);

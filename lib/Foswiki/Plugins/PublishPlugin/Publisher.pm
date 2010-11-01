@@ -391,7 +391,7 @@ BLAH
     $text =~ s/(^|\n)---\+ Last Published\n.*$//s;
     Foswiki::Func::saveTopic(
         $this->{historyWeb}, $this->{history}, $meta,
-        "$text---+ Last Published\n$this->{historyText}\n",
+        "$text---+ Last Published\n<noautolink>\n$this->{historyText}\n</noautolink>",
         { minor => 1, forcenewrevision => 1 }
     );
     my $url =
@@ -447,9 +447,17 @@ sub arrayDiff {
 sub logInfo {
     my ( $this, $header, $body ) = @_;
     $body ||= '';
-    Foswiki::Plugins::PublishPlugin::_display( CGI::b("$header:&nbsp;"),
+	if (defined $header and $header ne '')
+	{
+		$header = CGI::b("$header:&nbsp;");
+	}
+	else
+	{
+		$header = '';
+	}
+    Foswiki::Plugins::PublishPlugin::_display( $header,
         $body, CGI::br() );
-    $this->{historyText} .= "<b> $header </b>$body%BR%\n";
+    $this->{historyText} .= "$header$body%BR%\n";
 }
 
 sub logWarn {
