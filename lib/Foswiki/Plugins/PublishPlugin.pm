@@ -11,7 +11,7 @@ use Error qw( :try );
 use strict;
 
 our $VERSION = '$Rev$';
-our $RELEASE = '01 Nov 2010';
+our $RELEASE = '25 Mar 2011';
 our $SHORTDESCRIPTION =
 'Generate static output (HTML, PDF) optionally upload (FTP) the output to a publishing site.';
 
@@ -88,7 +88,7 @@ sub _display {
 # Allow manipulation of $Foswiki::cfg{PublishPlugin}{Dir}
 sub _publishControlCentre {
 
-    my $query = TWiki::Func::getCgiQuery();
+    my $query = Foswiki::Func::getCgiQuery();
 
     # Check access to this interface!
     if ( defined &Foswiki::Func::isAnAdmin && !Foswiki::Func::isAnAdmin() ) {

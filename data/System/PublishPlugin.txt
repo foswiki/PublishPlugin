@@ -45,23 +45,21 @@ When you want to read a document stored in Foswiki, you have to have access to t
 The PublishPlugin supports the generation of several different read-only document formats from Foswiki pages, including HTML and PDF.
 
 ---++ Features
-   * All standard Foswiki macros are interpreted
-   * Plugins are called
-   * Unresolved links to non-existent topics are silently ignored
+   * All standard Foswiki macros are interpreted, and plugins are called
    * Topic links internal to the wiki are translated to relative links
-   * Powerful support for choosing what content gets published
-   * Any links to the 'pub' areas of topics in the web are automatically resolved and the referenced files copied
+   * Powerful support for choosing what content gets published - fully compatible with [[Foswiki:Extensions.BookmakerPlugin][BookmakerPlugin]]
+   * Any links to the 'pub' areas of topics in the web are automatically resolved, and the referenced files copied
    * Any links to images outside the wiki are resolved, and the image is stored in the output (requires LWP)
    * Output in HTML or PDF. HTML can be compressed in different archive formats.
    * Full support for hierarchical webs
    * Multiple instances (e.g. dev, test, prod) can be specified
    * Special output format specific templates (such as viewpdf) can be used
    * Able to publish HTML and referenced files directly to a remote server via ftp
-    * Complete history of what was published, and when!
+   * Complete history of what was published, and when!
 
 ---++ Usage
 ---+++ Publish Form
-The easiest way to publish a web is from this topic, by filling in the following form.
+The quickest way to publish a web is by completing the following form.
 
 The output is generated in a directory designated during installation. The progress messages printed during documentation generation tell you exactly where the output is. Admins can use the PublishPluginControlCentre to manage the published output.
 
@@ -69,369 +67,459 @@ Publishing is an access-controlled process; before you can publish, you have to 
 
 You can also create a [[#PublishTopic][permanent topic in a web]] to help with a repeated publishing process.
 
+%H% Most publishing tasks will only require setting the immediately visible options.
+Other more advanced options can be accessed by opening the collabsible sections.
+
 %ADDTOHEAD{text="<style type=\"text/css\" media=\"all\">
-.foswikiPageForm table th,
-.foswikiPageForm table td {
-	vertical-align:top;
-	border-bottom:1px solid #ddd;
-	padding:.5em;
+.foswikiPageForm table th, .foswikiPageForm table td {
+  vertical-align:top;
+  border-bottom:1px solid #ddd;
+  padding:.5em;
 }
 table.publishForm {
-	width:100%;
+  width:100%;
 }
 table.publishForm th {
-	background:#2989bb;
-	color:#fff;
+  background:#2989bb;
+  color:#fff;
 }
-table.publishForm th,
-table.publishForm td {
-	padding:0.4em 1em;
-	text-align:left;
+table.publishForm th, table.publishForm td {
+  padding:0.4em 1em;
+  text-align:left;
 }
 table.publishForm th {
-	border-color:#2989bb;
+  border-color:#2989bb;
 }
 table.publishForm td {
-	border-color:#dfdfdf;
+  border-color:#dfdfdf;
 }
 table.publishForm .nameCol {
-	width:25%;
-	background:#f7f9f9;
+  background:#f1f1f1;
 }
 table.publishForm .inputCol {
-	width:30%;
-	background:#f7f9f9;
+  background:#f7f9f0;
 }
 table.publishForm .infoCol {
-	width:25%;
-	background:#f1f1f1;
+  background:#f1f1f1;
 }
 table.publishForm .paramCol {
-	width:10%;
-	background:#f1f1f1;
+  background:#f7f9f0;
 }
 </style>"}%
 
 <div class="foswikiPageForm">
 <form method="post" name="publish" action="%SCRIPTURL{rest}%/PublishPlugin/publish">
 <table class="foswikiTable publishForm">
-	<tr>
-		<th colspan="4">Choose what to publish</th>
+  <tr>
+    <th colspan="3">Choose what to publish</th>
+    <th> URL Parameter </th>
+  </tr>
+  <tr>
+    <td class="nameCol">
+      Web
+    </td>
+    <td class="inputCol">
+      <select name="web" class="foswikiSelect">%WEBLIST{"<option $marker value='$name'>$name</option>" selection="%URLPARAM{"web" default="%WEB%" encode="entity"}%"}%</select>
+    </td>
+    <td class="infoCol">
+      The Web to publish. This is required to provide a context for the publishing process (e.g. web preference settings), even if all topics in the =topiclist= have explicit web names.
+    </td>
+    <td class="paramCol">
+      =web=
+    </td>
+  </tr>
+  <tr>
+    <td class="nameCol"> 
+      Topic List
+    </td>
+    <td class="inputCol"> 
+      <input type="text" name="topiclist" class="foswikiInputField" value="%URLPARAM{"topiclist" default="" encode="entity"}%" size="30" title="Leave blank to publish all topics in the web"/>
+    </td>
+    <td class="infoCol">
+      Comma-separated list of topic names.
+      Leave blank to publish all topics in the web (as filtered by =inclusions= and =exclusions=). %BR%
+      You can use Foswiki macros (such as %SEARCH) in this list - for example, to
+      include the contents of a topic that contains a list of topic names in a
+      bulleted list, use =%<nop>SEARCH{"^   \*" type="regex" nonoise="on" topic="TheTopic" format="$pattern(.*?^\s*\*\s*(.*?)$.$)"}%=.
+
+	You can also use the [[#BookMaker][Bookmaker]] (see [[#Using_Bookmaker][Using Bookmaker]], below) to build such lists, and include them using the =%<nop>BOOKLIST{"Bookweb.BookName"}%= macro.
+
+	A non-blank =topiclist= is still subject to filtering against =inclusions= and =exclusions=.
+	  
+	Note that this list can include topics in other webs, by referring to them using the =Web.TopicName= syntax.
+    </td>
+    <td class="paramCol">
+      =topiclist=
+    </td>
+  </tr>
+  <tr>
+    <td colspan="4">
+      %TWISTY{mode="div" showlink="Advanced topic selection..."}%
+      <table class="foswikiTable publishForm">
+	<td class="nameCol"> 
+	  Include filter
+	</td>
+	<td class="inputCol"> 
+	  <input type="text" name="inclusions" class="foswikiInputField" value="%URLPARAM{"inclusions" default="*" encode="entity"}%" size="30" title="Use * to publish all topics in the topic list">
+	</td>
+	<td class="infoCol">
+	  Comma-separated list of [[#WildcardPattern][wildcard patterns]] that match the names of topics to include. This acts as a filter on the topic list. Use * to publish all topics in the list.
+	</td>
+	<td class="paramCol">
+	  =inclusions=
+	</td>
+	<tr class="expert">
+	  <td class="nameCol"> 
+	    Exclude filter
+	  </td>
+	  <td class="inputCol"> 
+	    <input type="text" name="exclusions" class="foswikiInputField" value="%URLPARAM{"exclusions" default="" encode="entity"}%" size="30" title="Leave blank to include all topics in the topic list" />
+	  </td>
+	  <td class="infoCol">
+	    Comma-separated list of [[#WildcardPattern][wildcard patterns]] that match the names of topics to exclude. This acts as a filter on the topic list. Leave blank to include all topics in the topic list.
+	  </td>
+	  <td class="paramCol">
+	    =exclusions=
+	  </td>
 	</tr>
-	<tr>
-		<td class="nameCol">
-			Web
-		</td>
-		<td class="inputCol">
-			<select name="web" class="foswikiSelect">%WEBLIST{"<option $marker value='$name'>$name</option>" selection="%URLPARAM{"web" default="%WEB%" encode="entity"}%"}%</select>
-		</td>
-		<td class="infoCol">
-			The Web to publish.
-		</td>
-		<td class="paramCol">
-			=web=
-		</td>
+	<tr class="expert">
+	  <td class="nameCol"> 
+	    Versions
+	  </td>
+	  <td class="inputCol"> 
+	    <input type="text" name="versions" class="foswikiInputField" value="%URLPARAM{"versions" default="" encode="entity"}%" size="30" title="Leave blank to publish the most recent version of each topic"/>
+	  </td>
+	  <td class="infoCol">
+	    Name of a topic that contains a table, each row of which maps a topic names to the version of that topic to publish. <br />
+	    The table can be generated by a =%<nop>SEARCH{}%= or other macro. For example: =|Web.<nop>TopicName|1.33|=.<br />
+		If a topic does not appear in the table, the most recent version will be published.
+	  </td>
+	  <td class="paramCol">
+	    =versions=
+	  </td>
 	</tr>
-	<tr>
-		<td class="nameCol"> 
-			Include (wildcard)
-		</td>
-		<td class="inputCol"> 
-			<input type="text" name="inclusions" class="foswikiInputField" value="%URLPARAM{"inclusions" default="*" encode="entity"}%" size="30"/>
-		</td>
-		<td class="infoCol">
-			Comma-separated list of [[#WildcardPattern][wildcard patterns]] that match the names of topics to include. Use * for all topics.
-		</td>
-		<td class="paramCol">
-			=inclusions=
-		</td>
+	<tr class="expert">
+	  <td class="nameCol"> 
+	    Filter topic contents
+	  </td>
+	  <td class="inputCol"> 
+	    <input type="text" name="topicsearch" class="foswikiInputField" value="%URLPARAM{"filter" default="" encode="entity"}%" size="30" title="Leave blank to include all topics"/>
+	  </td>
+	  <td class="infoCol">
+	    A [[#RegularExpression][regular expression]] that will cause a topic to be excluded if the RE matches the topic content.
+	  </td>
+	  <td class="paramCol">
+	    =topicsearch=
+	  </td>
 	</tr>
-	<tr>
-		<td class="nameCol"> 
-			Exclude (pattern)
-		</td>
-		<td class="inputCol"> 
-			<input type="text" name="exclusions" class="foswikiInputField" value="%URLPARAM{"exclusions" default="" encode="entity"}%" size="30"/>
-		</td>
-		<td class="infoCol">
-			Comma-separated list of [[#WildcardPattern][wildcard patterns]] that match the names of topics to exclude. Leave blank to include all topics.
-		</td>
-		<td class="paramCol">
-			=exclusions=
-		</td>
+      </table>
+      %ENDTWISTY%
+    </td>
+  </tr>
+  <!-- -->
+  <tr>
+    <th colspan="4">Processing options</th>
+  </tr>
+  <tr>
+    <td colspan="4">
+      Default processing of topics for publishing tries to render the topics as
+      closely to the way they are viewed in the wiki as possible. These options
+      provide a finer level of control.
+    </td>
+  </tr>
+  <tr>
+    <td colspan="4">
+      %TWISTY{mode="div" showlink="Show processing options..."}%
+      <table class="foswikiTable publishForm">
+	<tr class="expert">
+	  <td class="nameCol">Publish skin </td>
+	  <td class="inputCol">
+	    <input type="text" name="publishskin" class="foswikiInputField" size="20" value="basic_publish" title="Use basic_publish unless you have your own customised publishing skin"/>
+	  </td>
+	  <td class="infoCol">
+	    The skin provides the template for how topics are published. See [[%SYSTEMWEB%.Skins][Skins]] for more informations on skins.
+	    You are recommended to pick =basic_publish=, or =plain=, or a =print= skin.
+	    Your installation may also offer a special =export= or =publish= skin.<br />%I% The =view= [[SkinTemplates][template]] is used to generate published pages, so =view.%URLPARAM{"skin" default="basic_publish"}%.tmpl= is the template that will be used to generate the output. You can preview any topic in this skin simply by appending =?skin=%URLPARAM{"skin" default="basic_publish"}%= to the end of the view URL. Note that the standard =VIEW_TEMPLATE= template override still works when publishing.
+	  </td>
+	  <td class="paramCol">
+	    =publishskin=
+	  </td>
 	</tr>
-	<tr>
-		<td class="nameCol"> 
-			Versions (topic)
-		</td>
-		<td class="inputCol"> 
-			<input type="text" name="versions" class="foswikiInputField" value="%URLPARAM{"versions" default="" encode="entity"}%" size="30"/>
-		</td>
-		<td class="infoCol">
-			Name of a topic that contains a table, each row of which maps a topic names to the version of that topic to publish. <br />
-			Leave blank to publish the most recent version of each topic.
-			%TWISTY% The table can be generated by a =%<nop>SEARCH{}%= or other macro. For example: =|Web.<nop>TopicName|1.33|=.<br />
-			If a topic does not appear in the table, the most recent version will be published. %ENDTWISTY%
-		</td>
-		<td class="paramCol">
-			=versions=
-		</td>
+	<tr class="expert">
+	  <td class="nameCol"> 
+	    Enable plugins (plugin names) 
+	  </td>
+	  <td class="inputCol"> 
+	    <input type="text" name="enableplugins" class="foswikiInputField" value="%URLPARAM{"enableplugins" default="" encode="entity"}%" size="30"title="Leave blank to enable all plugins"/><br />%TWISTY{showlink="View currently enabled plugins" hidelink="Hide currently enabled plugins"}% %ACTIVATEDPLUGINS% %ENDTWISTY%
+	  </td>
+	  <td class="infoCol">
+	    Comma-separated list of Plugins to enable during publishing.
+
+	    If you leave this field blank then all plugins enabled in the wiki will be run when generating the published output. You are recommended to disable any plugins that generate interactive buttons in the output.
+	  </td>
+	  <td class="paramCol">
+	    =enableplugins=
+	  </td>
 	</tr>
-	<tr>
-		<td class="nameCol"> 
-			Filter topic contents (regex)
-		</td>
-		<td class="inputCol"> 
-			<input type="text" name="filter" class="foswikiInputField" value="%URLPARAM{"filter" default="" encode="entity"}%" size="30" />
-		</td>
-		<td class="infoCol">
-			A [[#RegularExpression][regular expression]] that will cause a topic to be excluded if the RE matches the topic content. <br />
-			Leave blank to include all topics.
-		</td>
-		<td class="paramCol">
-			=filter=
-		</td>
+	<tr class="expert">
+	  <td class="nameCol">Templates </td>
+	  <td class="inputCol">
+	    <input type="text" name="templates" class="foswikiInputField" size="20" value="" title="Leave blank unless you need a special template"/>
+	  </td>
+	  <td class="infoCol">
+	    By default the plugin uses the default =view= templates when it renders topics
+	    for publishing. You can change this to a list of one or more templates that
+	    you want to render using.
+
+	    For example, you might want to use =viewpdf= to render a PDF version of the
+	    topic (if you have this action available). See [[Skins]] for a list of the
+	    template files available by default.
+	  </td>
+	  <td class="paramCol">
+	    =templates=
+	  </td>
 	</tr>
-	<tr>
-		<td class="nameCol"> 
-			Enable plugins (plugin names)
-		</td>
-		<td class="inputCol"> 
-			<input type="text" name="enableplugins" class="foswikiInputField" value="%URLPARAM{"enableplugins" default="" encode="entity"}%" size="30"/><br />%TWISTY{showlink="View currently enabled plugins" hidelink="Hide currently enabled plugins"}% %ACTIVATEDPLUGINS% %ENDTWISTY%
-		</td>
-		<td class="infoCol">
-			Comma-separated list of Plugins to enable during publish.
-			Leave blank to enable all plugins.<br />
-			You are recommended to disable any plugins that generate buttons in the output.
-		</td>
-		<td class="paramCol">
-			=enableplugins=
-		</td>
+      </table>
+      %ENDTWISTY%
+    </td>
+  </tr>
+  <!-- -->
+  <tr>
+    <th colspan="4">Output options</th>
+  </tr>
+  <tr>
+    <td colspan="4">
+      The output will be generated on the server, in the directory pointed to by the ={PublishPlugin}{Dir}= [[%SCRIPTURL{configure}%#PublishPlugin$Extensions][configuration setting]]. Administrators can
+      manage the contents of this directory from the browser using the
+      =%<nop>PUBLISHERS_CONTROL_CENTRE%= macro
+	(See PublishPluginControlCentre).<br />
+	%X% The rendered data can get pretty big, and the process itself puts a heavy load on the server, especially when using compression on large webs.
+    </td>
+  </tr>
+  <tr>
+    <td class="nameCol">Output format</td>
+    <td class="inputCol">
+      <select name="format" id="selectedFormat" class="foswikiSelect" onchange="showPublishOptions()">
+	<option>file</option>
+	<option>zip</option>
+	<option>tgz</option>
+	<option>pdf</option>
+	<option>ftp</option>
+      </select>
+    </td>
+    <td class="infoCol">
+      Generates HTML output (=file=), HTML output compressed as =zip= or =tgz=, HTML uploaded to a =ftp= server, or =pdf=.
+    </td>
+    <td class="paramCol">
+      =format=
+    </td>
+  </tr>
+  <tr>
+    <td class="nameCol">Publishing history topic</td>
+    <td class="inputCol">
+      <input type="text" name="history" class="foswikiInputField" size="30" value="PublishPluginHistory" />
+    </td>
+    <td class="infoCol">
+      This is where the history of your publishing is stored. Each time you publish, this topic is re-written with the log of the publishing process. You have to have "change" access to this topic. You can specify a topic in another web using the standard Web.Topic syntax.
+    </td>
+    <td class="paramCol">
+      =history=
+    </td>
+  </tr>
+  <!-- DIRECTORY OUTPUT OPTIONS -->
+  <tr class="publishOptionsSet fileOptions ftpOptions">
+    <th colspan="4">Directory output options</th>
+  </tr>
+  <tr class="publishOptionsSet fileOptions ftpOptions">
+    <td colspan="4">
+      Directory output options are only relevant for web output formats (<tt>file</tt> and <tt>ftp</tt>)
+      These formats generate a sitemap.xml, and can also generate default.htm, index.html and google site verification files.
+    </td>
+  </tr>
+  <tr>
+    <td colspan="4">
+      %TWISTY{mode="div" showlink="Show directory output options..."}%
+      <table class="foswikiTable publishForm">
+	<tr class="expert" class="publishOptionsSet fileOptions ftpOptions">
+	  <td class="nameCol">Google file </td>
+	  <td class="inputCol">
+	    <input type="text" size="30" name="googlefile" value="" class="foswikiInputField" title="Leave blank if you don't need one" />
+	  </td>
+	  <td class="infoCol">
+	    Generates the "HTML verification file" needed to verify your site claim.
+	    See <a href="http://www.google.com/webmasters/sitemaps/">Google webmaster tools</a>.
+	  </td>
+	  <td class="paramCol">
+	    =googlefile=
+	  </td>
 	</tr>
-	<!-- -->
-	<tr>
-		<th colspan="4">Output options</th>
+	<tr class="expert" class="publishOptionsSet fileOptions ftpOptions">
+	  <td class="nameCol">Default page (topic)</td>
+	  <td class="inputCol">
+	    <input type="text" size="30" name="defaultpage" value="WebHome" class="foswikiInputField" />
+	  </td>
+	  <td class="infoCol">
+	    Name of topic to used to generate default.htm, index.html
+	  </td>
+	  <td class="paramCol">
+	    =defaultpage=
+	  </td>
 	</tr>
-	<tr>
-		<td colspan="4">
-			The output will be generated on the server, in the directory pointed to by the ={PublishPlugin}{Dir}= [[%SCRIPTURL{configure}%#PublishPlugin$Extensions][configuration setting]]. Administrators can
-			manage the contents of this directory from the browser using the
-			=%<nop>PUBLISHERS_CONTROL_CENTRE%= macro
-			(See PublishPluginControlCentre).<br />
-			%X% The rendered data can get pretty big, and the process itself puts a heavy load on the server, especially when using compression on large webs.
-		</td>
+	<tr class="expert" class="publishOptionsSet fileOptions ftpOptions">
+	  <td class="nameCol">
+	    Relative directory
+	  </td>
+	  <td class="inputCol">
+	    <input type="text" size="30" name="relativedir" value="/" class="foswikiInputField" title="Use / to publish directly in {PublishPlugin}{Dir}" />
+	  </td>
+	  <td class="infoCol">
+	    Path of a directory relative to ={PublishPlugin}{Dir}= where you want the output generated. '/' means generate the output directly in
+	    ={PublishPlugin}{Dir}=.
+	  </td>
+	  <td class="paramCol">
+	    =relativedir=
+	  </td>
 	</tr>
-	<tr>
-		<td class="nameCol">Publish skin</td>
-		<td class="inputCol">
-			<input type="text" name="skin" class="foswikiInputField" size="20" value="basic_publish" />
-		</td>
-		<td class="infoCol">
-			The skin provides the template for how topics are published. See [[%SYSTEMWEB%.Skins][Skins]] for more informations on skins. %TWISTY{mode="div"}%
-			You are recommended to pick =basic_publish=, or =plain=, or a =print= skin.
-			Your installation may also offer a special =export= or =publish= skin.<br />%I% The =view= [[SkinTemplates][template]] is used to generate published pages, so =view.%URLPARAM{"skin" default="basic_publish"}%.tmpl= is the template that will be used to generate the output. You can preview any topic in this skin simply by appending =?skin=%URLPARAM{"skin" default="basic_publish"}%= to the end of the view URL. Note that the standard =VIEW_TEMPLATE= template override still works when publishing.
-			%ENDTWISTY%
-		</td>
-		<td class="paramCol">
-			=skin=
-		</td>
+	<tr class="expert" class="publishOptionsSet fileOptions ftpOptions">
+	  <td class="nameCol">
+	    Relative URL
+	  </td>
+	  <td class="inputCol">
+	    <input type="text" size="30" name="relativeurl" value="/" class="foswikiInputField" title="Use / if you will publish to the root of your site" />
+	  </td>
+	  <td class="infoCol">
+	    The base URL that your published Foswiki topics will reside at, for instance to create different publishing instances like =dev=, =test= and =public=. Use =/= if you will publish to the root of your site. See also <a href="http://www.google.com/webmasters/sitemaps/">Google webmaster tools</a>.
+	  </td>
+	  <td class="paramCol">
+	    =relativeurl=
+	  </td>
 	</tr>
-	<tr>
-		<td class="nameCol">Output format</td>
-		<td class="inputCol">
-			<select name="format" id="selectedFormat" class="foswikiSelect" onchange="showPublishOptions()">
-				<option>file</option>
-				<option>zip</option>
-				<option>tgz</option>
-				<option>pdf</option>
-				<option>ftp</option>
-			</select>
-		</td>
-		<td class="infoCol">
-			Generates HTML output (=file=), HTML output compressed as =zip= or =tgz=, HTML uploaded to a =ftp= server, or =pdf=.
-		</td>
-		<td class="paramCol">
-			=format=
-		</td>
-	</tr>
-	<tr>
-		<td class="nameCol">Publishing history topic</td>
-		<td class="inputCol">
-			<input type="text" name="history" class="foswikiInputField" size="30" value="PublishPluginHistory" />
-		</td>
-		<td class="infoCol">
-			This is where the history of your publishing is stored. Each time you publish, this topic is re-written with the log of the publishing process. You have to have "change" access to this topic. You can specify a topic in another web using the standard Web.Topic syntax.
-		</td>
-		<td class="paramCol">
-			=history=
-		</td>
-	</tr>
-	<!-- WEB OPTIONS -->
-	<tr class="publishOptionsSet fileOptions ftpOptions">
-		<th colspan="4">Web options</th>
-	</tr>
-	<tr class="publishOptionsSet fileOptions ftpOptions">
-		<td colspan="4">
-			Web options are only relevant for web output formats (<tt>file</tt> and <tt>ftp</tt>)
-			The web formats generate a sitemap.xml, and can also generate default.htm, index.html and google site verification files.
-		</td>
-	</tr>
-	<tr class="publishOptionsSet fileOptions ftpOptions">
-		<td class="nameCol">Google file</td>
-		<td class="inputCol">
-			<input type="text" size="30" name="googlefile" value="" class="foswikiInputField" />
-		</td>
-		<td class="infoCol">
-			Generates the "HTML verification file" needed to verify your site claim.
-			See <a href="http://www.google.com/webmasters/sitemaps/">Google webmaster tools</a>.
-		</td>
-		<td class="paramCol">
-			=googlefile=
-		</td>
-	</tr>
-	<tr class="publishOptionsSet fileOptions ftpOptions">
-		<td class="nameCol">Default page (topic)</td>
-		<td class="inputCol">
-			<input type="text" size="30" name="defaultpage" value="WebHome" class="foswikiInputField" />
-		</td>
-		<td class="infoCol">
-			Name of topic to used to generate default.htm, index.html
-		</td>
-		<td class="paramCol">
-			=defaultpage=
-		</td>
-	</tr>
-	<tr class="publishOptionsSet fileOptions ftpOptions">
-		<td class="nameCol">
-			Relative directory
-		</td>
-		<td class="inputCol">
-			<input type="text" size="30" name="relativedir" value="/" class="foswikiInputField" />
-		</td>
-		<td class="infoCol">
-			Path of a directory relative to ={PublishPlugin}{Dir}= where you want the output generated. '/' means generate the output directly in
-		={PublishPlugin}{Dir}=.
-		</td>
-		<td class="paramCol">
-			=relativedir=
-		</td>
-	</tr>
-	<tr class="publishOptionsSet fileOptions ftpOptions">
-		<td class="nameCol">
-			Relative URL
-		</td>
-		<td class="inputCol">
-			<input type="text" size="30" name="relativeurl" value="/" class="foswikiInputField" />
-		</td>
-		<td class="infoCol">
-			The base URL that your published Foswiki topics will reside at, for instance to create different publishing instances like =dev=, =test= and =public=. Use =/= if you will publish to the root of your site. See also <a href="http://www.google.com/webmasters/sitemaps/">Google webmaster tools</a>.
-		</td>
-		<td class="paramCol">
-			=relativeurl=
-		</td>
-	</tr>
-	<!-- FTP OPTIONS -->
+      </table>
+      %ENDTWISTY%
+    </td>
+  </tr>
+  <!-- FTP OPTIONS -->
+  <tr class="publishOptionsSet ftpOptions">
+    <th colspan="4">FTP output options</th>
+  </tr>
+  <tr class="publishOptionsSet ftpOptions">
+    <td colspan="4">
+      FTP output options are only relevant if the output format is =ftp=.
+    </td>
+  </tr>
+  <tr>
+    <td colspan="4">
+      %TWISTY{mode="div" showlink="Show FTP options..."}%
+      <table class="foswikiTable publishForm">
 	<tr class="publishOptionsSet ftpOptions">
-		<th colspan="4">FTP options</th>
+	  <td class="nameCol">
+	    Server address
+	  </td>
+	  <td class="inputCol">
+	    <input type="text" size="30" name="destinationftpserver" value="" class="foswikiInputField" />
+	  </td>
+	  <td class="infoCol">
+	    Set to blank to proof the output prior to uploading to your site.
+	  </td>
+	  <td class="paramCol">
+	    =destinationftpserver=
+	  </td>
 	</tr>
 	<tr class="publishOptionsSet ftpOptions">
-		<td colspan="4">
-			 FTP options are only relevant if the output format is =ftp=. <br />
-			The FTP output generator was written by Foswiki:Main.SvenDowideit.
-		</td>
+	  <td class="nameCol">Server path</td>
+	  <td class="inputCol">
+	    <input type="text" size="30" name="destinationftppath" value="" class="foswikiInputField" />
+	  </td>
+	  <td class="infoCol">
+	    Path to upload to on the FTP server.
+	  </td>
+	  <td class="paramCol">
+	    =destinationftppath=
+	  </td>
 	</tr>
 	<tr class="publishOptionsSet ftpOptions">
-		<td class="nameCol">
-			Server address
-		</td>
-		<td class="inputCol">
-			 <input type="text" size="30" name="destinationftpserver" value="" class="foswikiInputField" />
-		</td>
-		<td class="infoCol">
-			Set to blank to proof the output prior to uploading to your site.
-		</td>
-		<td class="paramCol">
-			=destinationftpserver=
-		</td>
+	  <td class="nameCol">Username</td>
+	  <td class="inputCol">
+	    <input type="text" size="30" name="destinationftpusername" value="" class="foswikiInputField" />
+	  </td>
+	  <td class="infoCol">
+	    FTP server user name.
+	  </td>
+	  <td class="paramCol">
+	    =destinationftpusername=
+	  </td>
 	</tr>
 	<tr class="publishOptionsSet ftpOptions">
-		<td class="nameCol">Server path</td>
-		<td class="inputCol">
-			<input type="text" size="30" name="destinationftppath" value="" class="foswikiInputField" />
-		</td>
-		<td class="infoCol">
-			Path to upload to on the FTP server.
-		</td>
-		<td class="paramCol">
-			=destinationftppath=
-		</td>
+	  <td class="nameCol">
+	    Password
+	  </td>
+	  <td class="inputCol">
+	    <input type="password" size="30" name="destinationftppassword" value="" class="foswikiInputField" />
+	  </td>
+	  <td class="infoCol">
+	    FTP server password.
+	  </td>
+	  <td class="paramCol">
+	    =destinationftppassword=
+	  </td>
 	</tr>
-	<tr class="publishOptionsSet ftpOptions">
-		<td class="nameCol">Username</td>
-		<td class="inputCol">
-			<input type="text" size="30" name="destinationftpusername" value="" class="foswikiInputField" />
-		</td>
-		<td class="infoCol">
-			FTP server user name.
-		</td>
-		<td class="paramCol">
-			=destinationftpusername=
-		</td>
+	<tr class="publishOptionsSet ftpOptions expert">
+	  <td class="nameCol">
+	    Fast publish
+	  </td>
+	  <td class="inputCol">
+	    <input type="checkbox" name="fastupload" checked="checked" class="foswikiCheckbox" />
+	  </td>
+	  <td class="infoCol">
+	    Speed up the ftp publishing by only uploading modified files. This will store a (tiny) checksum (.md5) file on the server alongside each uploaded file which will be used to optimise future uploads. Recommended.
+	  </td>
+	  <td class="paramCol">
+	    =fastupload=
+	  </td>
 	</tr>
-	<tr class="publishOptionsSet ftpOptions">
-		<td class="nameCol">
-			Password
-		</td>
-		<td class="inputCol">
-			<input type="password" size="30" name="destinationftppassword" value="" class="foswikiInputField" />
-		</td>
-		<td class="infoCol">
-			FTP server password.
-		</td>
-		<td class="paramCol">
-			=destinationftppassword=
-		</td>
+      </table>
+      %ENDTWISTY%
+    </td>
+  </tr>
+  <!-- OTHER OUTPUT OPTIONS -->
+  <tr>
+    <th colspan="4">
+      Other output generator options
+    </th>
+  </tr>
+  <tr>
+    <td colspan="4">
+      Some output generators (e.g. pdf) support extra options.
+    </td>
+  </tr>
+  <tr>
+    <td colspan="4">
+      %TWISTY{mode="div" showlink="Show extra options..."}%
+      <table class="foswikiTable publishForm">
+	<tr class="expert">
+	  <td class="nameCol">
+	    Extras
+	  </td>
+	  <td class="inputCol">
+	    <textarea name="extras" rows="7" cols="30" class="foswikiInputField">%URLPARAM{"extras" default="" encode="entity"}%</textarea>
+	  </td>
+	  <td class="infoCol">
+	    Some output generators support extra options (e.g. for =pdf=, you can add =htmldoc= command-line parameters here, such as =--linkstyle underline=). These options are passed directly to the output generator.
+	  </td>
+	  <td class="paramCol">
+	    =extras=
+	  </td>
 	</tr>
-	<tr class="publishOptionsSet ftpOptions">
-		<td class="nameCol">
-			Fast publish
-		</td>
-		<td class="inputCol">
-			<input type="checkbox" name="fastupload" checked="checked" class="foswikiCheckbox" />
-		</td>
-		<td class="infoCol">
-			Speed up the ftp publishing by only uploading modified files. This will store a (tiny) checksum (.md5) file on the server alongside each uploaded file which will be used to optimise future uploads. Recommended.
-		</td>
-		<td class="paramCol">
-			=fastupload=
-		</td>
-	</tr>
-	<!-- OTHER OUTPUT OPTIONS -->
-	<tr>
-		<th colspan="4">
-			Other output generator options
-		</th>
-	</tr>
-	<tr>
-		<td class="nameCol">
-			Extras
-		</td>
-		<td class="inputCol">
-			<textarea name="extras" rows="7" cols="30" class="foswikiInputField">%URLPARAM{"extras" default="" encode="entity"}%</textarea>
-		</td>
-		<td class="infoCol">
-			Some output generators support extra options (e.g. for =pdf=, you can add =htmldoc= command-line parameters here, such as =--linkstyle underline=).
-		</td>
-		<td class="paramCol">
-			=extras=
-		</td>
-	</tr>
-	<!-- SUBMIT -->
-	<tr>
-		<td colspan="4" class="inputCol">
-			<input type="submit" class="foswikiSubmit" value="Publish" />
-		</td>
-	</tr>
+      </table>
+      %ENDTWISTY%
+    </td>
+  </tr>
+  <!-- SUBMIT -->
+  <tr>
+    <td colspan="4" class="inputCol">
+      <input type="submit" class="foswikiSubmit" value="Publish" />
+    </td>
+  </tr>
 </table>
 </form>
 </div>
@@ -480,6 +568,14 @@ skin=myskin;
 defaultpage=WebHome'
 rel='nofollow'>Publish this page</a></span>%TMPL:END%
 </verbatim>
+
+#BookMaker
+---+++ Using Bookmaker
+The Bookmaker allows you to select a number of topics by visiting them in turn and adding them to the book. Once your book is complete, you can return to this page to publish it.
+
+To start the bookmaker, %IF{"context 'BookmakerPluginEnabled'"
+ then="$percntBUTTON{\"click here\" class=\"bookmaker_button\" href=\"%SCRIPTURL{view}%/%SYSTEMWEB%/BookmakerPlugin?open_bookmaker=Sandbox.WebOrder\"}$percnt"
+ else="enable the !BookmakerPlugin, and revisit this page to enable the interface"}%. Once the bookmaker is running, visit the pages you want to add to the book and add them to the book. Once you are finished, use the bookmaker interface to return to this page to publish the results. To publish a book generated by Bookmaker, use the =%<nop>BOOKLIST{"Bookweb.BookName"}%= macro in the =topiclist= parameter.
 
 #PublishTopic
 ---+++ Using a Publish Topic (configtopic)
@@ -540,9 +636,9 @@ by restricting web access to this directory, for example in the Apache
 configuration.
 
 ---++ Info
-This add-on started life as the !GenHTMLAddon, written by Foswiki:Main/CrawfordCurrie at Motorola. It was then extended by Eric Scouten, and then further fixed and enhanced by Foswiki:Main/CrawfordCurrie (http://c-dot.co.uk). It has also been extended by Foswiki:Main/SvenDowideit and Foswiki:Main/MartinCleaver, and most recently refactored for Foswiki by Foswiki:Main/CrawfordCurrie.
+This add-on started life as the !GenHTMLAddon, written by Foswiki:Main/CrawfordCurrie at Motorola. It was then extended by Eric Scouten, and then further fixed and enhanced by Foswiki:Main/CrawfordCurrie (http://c-dot.co.uk). It has also been extended by Foswiki:Main/SvenDowideit and Foswiki:Main/MartinCleaver, and most recently refactored for Foswiki by Foswiki:Main/CrawfordCurrie. Other significant contributors are Foswiki:Main.ArthurClemens and Foswiki:Main.MichaelDaum.
 
-|  Authors: | Foswiki:Main/CrawfordCurrie, Eric Scouten, Foswiki:Main.SvenDowideit, Foswiki:Main.MartinCleaver, Foswiki:Main.ArthurClemens |
+|  Author: | Foswiki:Main/CrawfordCurrie |
 |  Dependencies: | %$DEPENDENCIES% |
 |  License: | GPL |
 |  Version: | %$VERSION% |
@@ -572,7 +668,7 @@ This add-on started life as the !GenHTMLAddon, written by Foswiki:Main/CrawfordC
   obey proxy settings (untested) |
 |  12824 | Added support for new internal api - no user changes |
 |  12708 | Added UI for FTP. Added .spec file. Fixed Item3515 and Item2725 |
-|  12028 | Michael Daum - create a new TWiki object for every topic, don't reuse the current one (Item3139) |
+|  12028 | Michael Daum - create a new wiki object for every topic, don't reuse the current one (Item3139) |
 |  10412 | Correction to the correction for anchors. |
 |  10345 | Correction to support anchors in URLs properly |
 |  10242 | Martin Cleaver - changes to allow generation of viewprint and viewxxx when specified by TEMPLATE; multiple INSTANCE (dev/test/prod); (Item2269) |
