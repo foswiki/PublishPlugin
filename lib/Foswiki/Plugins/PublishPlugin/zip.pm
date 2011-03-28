@@ -27,12 +27,24 @@ use File::Path;
 sub new {
     my $class = shift;
     my $this = $class->SUPER::new(@_);
+    $this->{params}->{outfile} ||= "zip";
 
     eval 'use Archive::Zip qw( :ERROR_CODES :CONSTANTS )';
     die $@ if $@;
     $this->{zip} = Archive::Zip->new();
 
     return $this;
+}
+
+sub param_schema {
+    my $class = shift;
+    return {
+	outfile => {
+	    default => 'zip',
+	    validator => \&Foswiki::Plugins::PublishPlugin::Publisher::validateFilename
+	},
+	%{$class->SUPER::param_schema()}
+    };
 }
 
 sub addDirectory {
@@ -56,12 +68,9 @@ sub addFile {
 sub close {
     my $this = shift;
     my $dir  = $this->{path};
-    if ( $this->{web} =~ m!^(.*)/.*?$! ) {
-        $dir .= $1;
-    }
     eval { File::Path::mkpath($dir) };
     $this->{logger}->logError($@) if $@;
-    my $landed = "$this->{web}.zip";
+    my $landed = "$this->{params}->{outfile}.zip";
     $this->{logger}->logError("Error writing $landed")
       if $this->{zip}->writeToFileNamed("$this->{path}$landed");
     return $landed;

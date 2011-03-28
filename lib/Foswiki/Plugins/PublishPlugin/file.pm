@@ -28,68 +28,98 @@ sub new {
     my $class = shift;
     my $this = $class->SUPER::new(@_);
 
-    foreach my $param qw(defaultpage googlefile relativeurl) {
-        my $p = $this->{query}->param($param) || '';
-        $p =~ /^(.*)$/;
-        $this->{$param} = $1;
-    }
-
     my $oldmask = umask( oct(777) - $Foswiki::cfg{RCS}{dirPermission} );
-    eval { File::Path::mkpath("$this->{path}$this->{web}"); };
+    $this->{params}->{outfile} ||= 'file';
+
+    if (-e "$this->{path}/$this->{params}->{outfile}") {
+	File::Path::rmtree("$this->{path}/$this->{params}->{outfile}");
+    }
+    eval { File::Path::mkpath($this->{path}); };
     umask( $oldmask );
     die $@ if $@;
 
     return $this;
 }
 
+sub param_schema {
+    my $class = shift;
+    return {
+	outfile => {
+	    default => 'file',
+	    validator => \&Foswiki::Plugins::PublishPlugin::Publisher::validateFilename
+	},
+	googlefile  => {},
+	defaultpage => { default => 'WebHome' },
+	relativeurl => { default => '/' },
+	%{$class->SUPER::param_schema}
+    };
+}
+
 sub addDirectory {
     my ( $this, $name ) = @_;
-    my $d = "$this->{web}/$name";
     my $oldmask = umask( oct(777) - $Foswiki::cfg{RCS}{dirPermission} );
-    eval { File::Path::mkpath("$this->{path}$d") };
+    eval { File::Path::mkpath("$this->{path}$this->{params}->{outfile}/$name") };
     $this->{logger}->logError($@) if $@;
     umask( $oldmask );
-    push( @{ $this->{dirs} }, $d );
+    push( @{ $this->{dirs} }, $name );
 }
 
 sub addString {
     my ( $this, $string, $file ) = @_;
 
-    my $f = "$this->{web}/$file";
     my $fh;
-    if ( open( $fh, '>', "$this->{path}$f" ) ) {
+    my $d = $file;
+    if ($d =~ m#(.*)/[^/]*$#) {
+	File::Path::mkpath("$this->{path}$this->{params}->{outfile}/$1");
+    }
+    if ( open( $fh, '>', "$this->{path}$this->{params}->{outfile}/$file" ) ) {
         binmode($fh);
         print $fh $string;
         close($fh);
-        push( @{ $this->{files} }, $f );
+        push( @{ $this->{files} }, $file );
     }
     else {
-        $this->{logger}->logError("Cannot write $f: $!");
+        $this->{logger}->logError("Cannot write $file: $!");
     }
 
-    if ( $file =~ /(.*)\.html?$/ ) {
+    if ( $file =~ m#([^/\.]*)\.html?$# ) {
         my $topic = $1;
-        push( @{ $this->{urls} }, "$file" );
+        push( @{ $this->{urls} }, $file );
 
-        # write link from index.html to actual topic
-        if ( $this->{defaultpage} && $topic eq $this->{defaultpage} ) {
-            $this->addString( $string, 'default.htm' );
-            $this->addString( $string, 'index.html' );
-            $this->{logger}->logInfo($topic, '(default.htm, index.html)');
-        }
+	unless ( $topic eq 'default' || $topic eq 'index' ) {
+	    # write link from index.html to actual topic
+	    my $link = "<a href='$file'>$file</a><br>";
+	    $this->_catString( $link, 'default.htm' );
+	    $this->_catString( $link, 'index.html' );
+	    $this->{logger}->logInfo($topic, '(default.htm, index.html)');
+	}
     }
+}
+
+sub _catString {
+    my ( $this, $string, $file ) = @_;
+
+    my $data;
+    my $fh;
+    if ( open( $fh, '<', "$this->{path}$this->{params}->{outfile}/$file" ) ) {
+	local $/ = undef;
+	$data = <$fh> . "\n" . $string;
+	close($fh);
+    } else {
+	$data = $string;
+    }
+    $this->addString($data, $file);
 }
 
 sub addFile {
     my ( $this, $from, $to ) = @_;
-    my $f    = "$this->{web}/$to";
-    my $dest = "$this->{path}$f";
+    my $dest = "$this->{path}$this->{params}->{outfile}/$to";
     File::Copy::copy( $from, $dest )
       or $this->{logger}->logError("Cannot copy $from to $dest: $!");
     my @stat = stat($from);
     $this->{logger}->logError("Unable to stat $from") unless @stat;
     utime( @stat[ 8, 9 ], $dest );
-    push( @{ $this->{files} }, $f );
+    push( @{ $this->{files} }, $to );
 }
 
 sub close {
@@ -101,8 +131,8 @@ sub close {
     $this->{logger}->logInfo('', 'Published sitemap.xml');
 
     # write google verification files (comma seperated list)
-    if ( $this->{googlefile} ) {
-        my @files = split( /[,\s]+/, $this->{googlefile} );
+    if ( $this->{params}->{googlefile} ) {
+        my @files = split( /[,\s]+/, $this->{params}->{googlefile} );
         for my $file (@files) {
             my $simplehtml =
                 '<html><title>' 
@@ -113,7 +143,7 @@ sub close {
         }
     }
 
-    return $this->{web};
+    return $this->{params}->{outfile};
 }
 
 sub _createSitemap {
@@ -132,7 +162,7 @@ HERE
     my $urls = join(
         "\n",
         map {
-                "$topicTemplatePre$this->{relativeurl}"
+                "$topicTemplatePre$this->{params}->{relativeurl}"
               . "$_$topicTemplatePost\n"
           } @$filesRef
     );

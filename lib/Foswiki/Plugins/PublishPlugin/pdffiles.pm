@@ -27,23 +27,22 @@ my $debug = 1;
   Foswiki::Plugins::PublishPlugin::PDFWriter);
 
 sub new {
-    my ( $class, $path, $web, $extras ) = @_;
-    my $this = bless( $class->SUPER::new( $path, "${web}_$$" ), $class );
-    $this->{extras} = $extras;
+    my $class = shift;
+    my $this = $class->SUPER::new( @_ );
     return $this;
 }
 
 sub addString {
     my ( $this, $string, $file ) = @_;
     $this->SUPER::addString( $string, $file );
-    $this->writePdf( "$this->{path}/$this->{web}/$file.pdf", $file, $debug )
+    $this->writePdf( "$this->{path}/$file.pdf", $file, $debug )
       if ( $file =~ /\.html$/ );
 }
 
 sub addFile {
     my ( $this, $from, $to ) = @_;
     $this->SUPER::addFile( $from, $to );
-    $this->writePdf( "$this->{path}/$this->{web}/$to.pdf", $to, $debug )
+    $this->writePdf( "$this->{path}/$to.pdf", $to, $debug )
       if ( $to =~ /\.html$/ );
 }
 

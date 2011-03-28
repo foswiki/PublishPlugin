@@ -25,29 +25,36 @@ package Foswiki::Plugins::PublishPlugin::BackEnd;
 
 =begin TML
 
----++ ClassMethod new($path, $web, $extras, $logger, $query)
+---++ ClassMethod new($params, $path, $logger)
 
 Construct a new back end.
+   * =$params= ref to hash of param vals
    * =$path= - the target path of the publishing process
-   * =$web= - the web being published
-   * =$extras= - the =extras= URL parameter
    * =$logger= - ref to an object that supports logWarn, logInfo and logError
      methods (see Publisher.pm)
-   * =$query= - the CGI query that was used to invoke the publish process
 
 =cut
 
 sub new {
-    my ( $class, $path, $web, $extras, $logger, $query ) = @_;
+    my ( $class, $params, $path, $logger ) = @_;
     $path .= '/' unless $path =~ m#/$#;
     my $this = bless( {
         path   => $path,
-        web    => $web,
-        extras => $extras,
-        logger => $logger,
-        query  => $query,
+        params => $params,
+        logger => $logger
     }, $class );
     return $this;
+}
+
+=begin TML
+
+---++ ClassMethod param_schema -> \%schema
+Get schema of query parameters, in the same format as Publisher.pm
+
+=cut
+
+sub param_schema {
+    return {};
 }
 
 =begin TML
@@ -105,6 +112,8 @@ Errors should be logged to the logger.
 =cut
 
 sub close {
+    my $this = shift;
+    return $this->{path};
 }
 
 1;

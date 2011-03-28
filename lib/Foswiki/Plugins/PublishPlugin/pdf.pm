@@ -24,17 +24,26 @@ our @ISA = ( 'Foswiki::Plugins::PublishPlugin::file' );
 use File::Path;
 
 sub new {
-    my ( $class, $path, $web, $extras, $logger, $query ) = @_;
-    my $t = Foswiki::Time::formatTime(time, '$year$mo$day$hours$minutes$seconds', 'gmtime');
-    return $class->SUPER::new( $path, "${web}_$t", $extras, $logger, $query );
+    my $class = shift;
+    my $this = $class->SUPER::new(@_);
+    $this->{params}->{outfile} ||= "pdf";
+    return $this;
+}
+
+sub param_schema {
+    my $class = shift;
+    return {
+	outfile => {
+	    default => 'pdf',
+	    validator => \&Foswiki::Plugins::PublishPlugin::Publisher::validateFilename
+	},
+	%{$class->SUPER::param_schema()}
+    };
 }
 
 sub close {
     my $this = shift;
     my $dir  = $this->{path};
-    if ( $this->{web} =~ m!^(.*)/.*?$! ) {
-        $dir .= $1;
-    }
     eval { File::Path::mkpath($dir) };
     die $@ if ($@);
 
@@ -44,7 +53,7 @@ sub close {
     my $cmd = $Foswiki::cfg{PublishPlugin}{PDFCmd};
     die "{PublishPlugin}{PDFCmd} not defined" unless $cmd;
 
-    my $landed = "$this->{web}.pdf";
+    my $landed = "$this->{params}->{outfile}.pdf";
     my @extras = split( /\s+/, $this->{extras} || '' );
 
     $ENV{HTMLDOC_DEBUG} = 1;    # see man htmldoc - goes to apache err log

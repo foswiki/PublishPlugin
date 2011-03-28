@@ -20,23 +20,6 @@ _Originally written for TWiki, previously known as !GenHTMLAddOn, !PublishAddOn,
 
 %TOC%
 
-%ADDTOHEAD{"%TOPIC%" text="<script type=\"text/javascript\">
-//<![CDATA[
-function showPublishOptions() {
-    var select = document.getElementById('selectedFormat');
-    var chosen = select.value + 'Options';
-    var options = document.getElementsByClassName('publishOptionsSet');
-    for (var i = 0; i<options.length; i++) {
-        var mode = (options[i].className.indexOf(chosen) >= 0) ? '' : 'none';
-        options[i].style.display = mode;
-    }
-}
-if (foswiki.Event) {
-    foswiki.Event.addLoadEvent(showPublishOptions);
-}
-//]]>
-</script>"}%
-
 When you want to read a document stored in Foswiki, you have to have access to the web server that hosts that document. There are times when this may not be desirable, or even possible. For example:
    1 Foswiki is used to create documentation which has to be readable off-line
    1 Published versions of Foswiki pages must be read-only
@@ -264,16 +247,18 @@ table.publishForm .paramCol {
 	<tr class="expert">
 	  <td class="nameCol">Templates </td>
 	  <td class="inputCol">
-	    <input type="text" name="templates" class="foswikiInputField" size="20" value="" title="Leave blank unless you need a special template"/>
+	    <input type="text" name="templates" class="foswikiInputField" size="20" value="view" title="Use view unless you need a special template"/>
 	  </td>
 	  <td class="infoCol">
-	    By default the plugin uses the default =view= templates when it renders topics
-	    for publishing. You can change this to a list of one or more templates that
-	    you want to render using.
+	  Comma-separated list of template names.
 
-	    For example, you might want to use =viewpdf= to render a PDF version of the
-	    topic (if you have this action available). See [[Skins]] for a list of the
-	    template files available by default.
+	  By default the plugin uses the default =view= templates when it renders topics
+	  for publishing. You can change this to a list of one or more templates that
+	  you want to render using.
+
+	  For example, you might want to use =viewpdf= to render a PDF version of the
+	  topic (if you have this action available). See [[Skins]] for a list of the
+	  template files available by default.
 	  </td>
 	  <td class="paramCol">
 	    =templates=
@@ -326,20 +311,32 @@ table.publishForm .paramCol {
       =history=
     </td>
   </tr>
-  <!-- DIRECTORY OUTPUT OPTIONS -->
+  <!-- FILE OUTPUT OPTIONS -->
   <tr class="publishOptionsSet fileOptions ftpOptions">
-    <th colspan="4">Directory output options</th>
+    <th colspan="4">File output options</th>
   </tr>
   <tr class="publishOptionsSet fileOptions ftpOptions">
     <td colspan="4">
-      Directory output options are only relevant for web output formats (<tt>file</tt> and <tt>ftp</tt>)
-      These formats generate a sitemap.xml, and can also generate default.htm, index.html and google site verification files.
+      File output options are relevant when output is being written to local files
+      on disc.
     </td>
   </tr>
   <tr>
     <td colspan="4">
-      %TWISTY{mode="div" showlink="Show directory output options..."}%
+      %TWISTY{mode="div" showlink="Show file output options..."}%
       <table class="foswikiTable publishForm">
+	<tr class="expert" class="publishOptionsSet fileOptions ftpOptions">
+	  <td class="nameCol">Output file </td>
+	  <td class="inputCol">
+	    <input type="text" size="30" name="outfile" value="" class="foswikiInputField" title="Defaults to the name of the generator" />
+	  </td>
+	  <td class="infoCol">
+	    Specify the name of the target output file (or directory), used when the output is going to a files e.g. file, pdf, zip, tgz
+	  </td>
+	  <td class="paramCol">
+	    =outfile=
+	  </td>
+	</tr>
 	<tr class="expert" class="publishOptionsSet fileOptions ftpOptions">
 	  <td class="nameCol">Google file </td>
 	  <td class="inputCol">
@@ -644,54 +641,55 @@ This add-on started life as the !GenHTMLAddon, written by Foswiki:Main/CrawfordC
 |  Version: | %$VERSION% |
 |  Release: | %$RELEASE% |
 |  Change History: | |
-|  01 Nov 2010 | Foswikitask:Item8658: fix rest output when publishing to file, pdf and ftp |
-|  29 Oct 2010 | Foswikitask:Item8522: support for Foswiki 1.1.x and also 1.0.x+Zone<nop>Plugin Foswikitask:Item1638: fixed finding resources with parameters (e.g. =?t=2365421=) |
-|  05 Feb 2010 | Documentation update. |
-|  12 Jan 2010 | Foswikitask:Item2557: fixed publish head elements added by ADDTOHEAD |
-|  11 Jan 2010 | Foswikitask:Item2615: fixed finding resources not inside quotes |
-|  30 May 2009 | Foswikitask:Item8168: fixed genopt (extras) |
-|  22 May 2009 | Foswikitask:Item8165: fixed missing BASEWEB and other internal preferences. This was resulting in the wrong web being used for some operations |
-|  16 May 2009 | Foswikitask:Item1626: fixed META{"formfield" Foswikitask:Item8150: (Marc Schaefer) fix for -skin parameter Foswikitask:Item1557: doc fix Foswikitask:Item1585: allow history topic in different web Foswikitask:Item871: add missing newline at start of topic text. Foswikitask:Item1449: topic publisher was not popping the context correctly Foswikitask:Item1632: improve backporting support |
-|  18 Mar 2009 | Foswikitask:Item804: automatically create publish dir Foswikitask:Item8078: support publishing to a subdir of the publish dir, under url param control |
-|  14 Feb 2009 | Foswikitask:Item1033: fixed button in PublishWeb |
-|  27 Nov 2008 | Foswikitask:Item8019: refactored as a plugin and tested in Foswiki |
-|  27 Oct 2008 | Item5385: Fixed doc for configtopic Item5388: $WEB and $TOPIC were not correct in %IF statements Item5390: remove comments from .css before processing for included resoures Item5706: Improved FTP upload process for incrementally maintained webs Item6029: expand config topic on load to support use of searches Item6030: respect VIEW_TEMPLATE in published topics Item6092: expand common tags in configtopic Item6094: move sitemap options into base file generator Item6110: rename settings in config topic to avoid clashes with other plugins |
-|  11 Dec 2007 | Item5099 fixed |
-|  10 Nov 2007 | Tested on 4.2.0. Item4624:, Item4625: Item4830: fixed. Item4825: added a basic skin to avoid the confusion caused by =text= skin. Item4951: added interface to allow management of output files |
-|  13222 | fixed ftp publish, added doco, and added enabled plugin selection funcitonality |
-|  13064 | Item3722 worked around core attaching URL params to internal URLs |
-|  12961 | Item3671 cannot publish without write access to history topic, so \
+|  2.2.0 (28 Mar 2011) | Foswiki:Tasks/Item8225: fix handling of plugin contexts Item2635: make sure index.html is generated Foswiki:Tasks/Item10529: test integration with BookmakerPlugin via new topiclist parameter |
+|  2.1.7 (01 Nov 2010) | Foswikitask:Item8658: fix rest output when publishing to file, pdf and ftp |
+|  2.1.6 (29 Oct 2010) | Foswikitask:Item8522: support for Foswiki 1.1.x and also 1.0.x+Zone<nop>Plugin Foswikitask:Item1638: fixed finding resources with parameters (e.g. =?t=2365421=) |
+|  2.1.5 (05 Feb 2010) | Documentation update. |
+|  2.1.4 (12 Jan 2010) | Foswikitask:Item2557: fixed publish head elements added by ADDTOHEAD |
+|  2.1.3 (11 Jan 2010) | Foswikitask:Item2615: fixed finding resources not inside quotes |
+|  2.1.2 (30 May 2009) | Foswikitask:Item8168: fixed genopt (extras) |
+|  2.1.1 (22 May 2009) | Foswikitask:Item8165: fixed missing BASEWEB and other internal preferences. This was resulting in the wrong web being used for some operations |
+|  2.1.0 (16 May 2009) | Foswikitask:Item1626: fixed META{"formfield" Foswikitask:Item8150: (Marc Schaefer) fix for -skin parameter Foswikitask:Item1557: doc fix Foswikitask:Item1585: allow history topic in different web Foswikitask:Item871: add missing newline at start of topic text. Foswikitask:Item1449: topic publisher was not popping the context correctly Foswikitask:Item1632: improve backporting support |
+|  2.0.2 (18 Mar 2009) | Foswikitask:Item804: automatically create publish dir Foswikitask:Item8078: support publishing to a subdir of the publish dir, under url param control |
+|  2.0.1 (14 Feb 2009) | Foswikitask:Item1033: fixed button in PublishWeb |
+|  2.0.0 (27 Nov 2008) | Foswikitask:Item8019: refactored as a plugin and tested in Foswiki |
+|  1.6.5 (27 Oct 2008) | Item5385: Fixed doc for configtopic Item5388: $WEB and $TOPIC were not correct in %IF statements Item5390: remove comments from .css before processing for included resoures Item5706: Improved FTP upload process for incrementally maintained webs Item6029: expand config topic on load to support use of searches Item6030: respect VIEW_TEMPLATE in published topics Item6092: expand common tags in configtopic Item6094: move sitemap options into base file generator Item6110: rename settings in config topic to avoid clashes with other plugins |
+|  1.6.4 (11 Dec 2007) | Item5099 fixed |
+|  1.6.3 (10 Nov 2007) | Tested on 4.2.0. Item4624:, Item4625: Item4830: fixed. Item4825: added a basic skin to avoid the confusion caused by =text= skin. Item4951: added interface to allow management of output files |
+|  1.6.2 | fixed ftp publish, added doco, and added enabled plugin selection funcitonality |
+|  1.6.1 | Item3722 worked around core attaching URL params to internal URLs |
+|  1.6.0 | Item3671 cannot publish without write access to history topic, so \
   security now checked early. Item3619 Cleaned up error handling from \
   writers. Item3675 added history topic to record changeset. Plus major \
   refactoring of main class to get rid of some of the cruft that had built \
   up from many authors. Item2726: uses getExternalResource now, so should \
   obey proxy settings (untested) |
-|  12824 | Added support for new internal api - no user changes |
-|  12708 | Added UI for FTP. Added .spec file. Fixed Item3515 and Item2725 |
-|  12028 | Michael Daum - create a new wiki object for every topic, don't reuse the current one (Item3139) |
-|  10412 | Correction to the correction for anchors. |
-|  10345 | Correction to support anchors in URLs properly |
-|  10242 | Martin Cleaver - changes to allow generation of viewprint and viewxxx when specified by TEMPLATE; multiple INSTANCE (dev/test/prod); (Item2269) |
-|  10063 | Bugfix Item2216 |
-|  10006 | Crawford Currie - fixed problem where it was failing to remove &lt;base> tags completely (Item2200) |
-|  9986 | Crawford Currie - added doc on usage from command line, corrected sense of topicsearch filter (Item2120, Item2121), renamed parameters (old ones are still valid), corrected handling of empty web refs (Item2128), deprecated nopublish html-style tag in favour of !PublishWebPlugin-compatible style (though with richer semantics) (Item2196) |
-|  9823 | Crawford Currie - added support for hierarchical webs, and inclusion of external images. |
-|  9773 | Crawford Currie - added tgz and pdf support |
-|  9725 | Michael Daum - fixed rewriting urls; \
+|  1.5.5 | Added support for new internal api - no user changes |
+|  1.5.4 | Added UI for FTP. Added .spec file. Fixed Item3515 and Item2725 |
+|  1.5.3 | Michael Daum - create a new wiki object for every topic, don't reuse the current one (Item3139) |
+|  1.5.2 | Correction to the correction for anchors. |
+|  1.5.1 | Correction to support anchors in URLs properly |
+|  1.5.0 | Martin Cleaver - changes to allow generation of viewprint and viewxxx when specified by TEMPLATE; multiple INSTANCE (dev/test/prod); (Item2269) |
+|  1.4.3 | Bugfix Item2216 |
+|  1.4.2 | Crawford Currie - fixed problem where it was failing to remove &lt;base> tags completely (Item2200) |
+|  1.4.1 | Crawford Currie - added doc on usage from command line, corrected sense of topicsearch filter (Item2120, Item2121), renamed parameters (old ones are still valid), corrected handling of empty web refs (Item2128), deprecated nopublish html-style tag in favour of !PublishWebPlugin-compatible style (though with richer semantics) (Item2196) |
+|  1.4.0 | Crawford Currie - added support for hierarchical webs, and inclusion of external images. |
+|  1.3.9 | Crawford Currie - added tgz and pdf support |
+|  1.3.8 | Michael Daum - fixed rewriting urls; \
                  fixed nested resources issue; \
 		 creating a new prefs object for each topic |
-|  9713 | Corrected form action so it uses up the right web preferences |
-|  9695 | Michael Daum - recursively archive resources imported by css files;\
+|  1.3.7 | Corrected form action so it uses up the right web preferences |
+|  1.3.6 | Michael Daum - recursively archive resources imported by css files;\
       fixed several html errors in the !PublishPlugin and !PublishWeb topics;\
       removed hardcoded reference to print.pattern |
-|  8959 | TWiki-4 version. Also supports publishing to a file area, making TWiki easier to use as a CMS (see also Foswiki:Extensions/PublishWebPlugin, which does almost the same thing :-( ) |
-|  6276 | Item196 - bugfix for HTTP_HOST, as described in the Dev topic for the contrib |
-|  5566 | Changed interface to support wildcards, and lightened the plugin by replacing a lot of files with simpler ways of doing things. |
-|  5499 | Added Compress::Zlib dependency, as requested by Brad Taylor |
-|  27 Apr 2005 | 1.301 Crawford Currie - fixed minor issues highlighted by Bruce Dillahunty and Scott Claridge |
-|  11 Apr 2005 | 1.3 Crawford Currie - reworked the interface and code to work better |
-|  13 October 2004 | 1.200 Crawford Currie - Cairo compatible |
-|  7 Jan 2003 | 1.1 Initial version |
+|  1.3.5 | TWiki-4 version. Also supports publishing to a file area, making TWiki easier to use as a CMS (see also Foswiki:Extensions/PublishWebPlugin, which does almost the same thing :-( ) |
+|  1.3.4 | Item196 - bugfix for HTTP_HOST, as described in the Dev topic for the contrib |
+|  1.3.3 | Changed interface to support wildcards, and lightened the plugin by replacing a lot of files with simpler ways of doing things. |
+|  1.3.2 | Added Compress::Zlib dependency, as requested by Brad Taylor |
+|  1.3.1 (27 Apr 2005) | Crawford Currie - fixed minor issues highlighted by Bruce Dillahunty and Scott Claridge |
+|  1.3.0 (11 Apr 2005) | Crawford Currie - reworked the interface and code to work better |
+|  1.2.0 (13 October 2004) | Crawford Currie - Cairo compatible |
+|  1.1.0 (7 Jan 2003) | Initial version |
 |  Home: | http://foswiki.org/Extensions/%TOPIC% |
 |  Support: | http://foswiki.org/Support/%TOPIC% |
 

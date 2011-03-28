@@ -28,11 +28,23 @@ use Assert;
 sub new {
     my $class = shift;
     my $this = $class->SUPER::new(@_);
+    $this->{params}->{outfile} ||= "tgz";
 
     require Archive::Tar;
     $this->{tar} = Archive::Tar->new();
 
     return $this;
+}
+
+sub param_schema {
+    my $class = shift;
+    return {
+	outfile => {
+	    default => 'tgz',
+	    validator => \&Foswiki::Plugins::PublishPlugin::Publisher::validateFilename
+	},
+	%{$class->SUPER::param_schema()}
+    };
 }
 
 sub addString {
@@ -60,12 +72,9 @@ sub addFile {
 sub close {
     my $this = shift;
     my $dir  = $this->{path};
-    if ( $this->{web} =~ m!^(.*)/.*?$! ) {
-        $dir .= $1;
-    }
     eval { File::Path::mkpath($dir) };
     $this->{logger}->logError($@) if $@;
-    my $landed = "$this->{web}.tgz";
+    my $landed = "$this->{params}->{outfile}.tgz";
     unless ( $this->{tar}->write( "$this->{path}$landed", 1 ) ) {
         $this->{logger}->logError( $this->{tar}->error() );
     }

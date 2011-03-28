@@ -32,33 +32,38 @@ use File::Temp qw(:seekable);
 use File::Spec;
 
 sub new {
-    my ( $class, $path, $web, $extras, $logger, $query ) = @_;
-    my $this = $class->SUPER::new( $path, $web, $extras, $logger, $query );
+    my $class = shift;
+    my $this = $class->SUPER::new( @_ );
 
-    foreach my $param qw(destinationftpserver
-      destinationftppath destinationftpusername
-      destinationftppassword fastupload) {
-        my $p = $query->param($param);
-        die "'$param' query parameter missing" unless $p;
-        $p =~ /^(.*)$/;
-        $this->{$param} = $1;
-    }
-
-    $this->{fastupload} ||= 0;
-    die "destinationftppath param not defined"
-      unless ( defined( $this->{destinationftppath} ) );
-    die "destinationftpusername param not defined"
-      unless ( defined( $this->{destinationftpusername} ) );
-    if ( $this->{destinationftpserver} ) {
-        die "destinationftppassword param not defined"
-          unless ( defined( $this->{destinationftppassword} ) );
-        if ( $this->{destinationftppath} =~ /^\/?(.*)$/ ) {
-            $this->{destinationftppath} = $1;
+    $this->{params}->{fastupload} ||= 0;
+    if ( $this->{params}->{destinationftpserver} ) {
+        if ( $this->{params}->{destinationftppath} =~ /^\/?(.*)$/ ) {
+            $this->{params}->{destinationftppath} = $1;
         }
         $this->{logger}->logInfo('', "fastUpload = $this->{fastupload}");
     }
 
     return $this;
+}
+
+sub param_schema {
+    my $class = shift;
+    return {
+	destinationftpserver => {
+	    validator => \&Foswiki::Plugins::PublishPlugin::Publisher::validateNonEmpty
+	},
+	destinationftppath => {
+	    validator => \&Foswiki::Plugins::PublishPlugin::Publisher::validateNonEmpty
+	},
+	destinationftpusername => {
+	    validator => \&Foswiki::Plugins::PublishPlugin::Publisher::validateNonEmpty
+	},
+	destinationftppassword => {
+	    validator => \&Foswiki::Plugins::PublishPlugin::Publisher::validateNonEmpty
+	},
+	fastupload => { default => 1 },
+	%{$class->SUPER::param_schema()}
+    };
 }
 
 sub addString {
@@ -78,9 +83,9 @@ sub addFile {
 sub _upload {
     my ( $this, $to ) = @_;
 
-    return unless ( $this->{destinationftpserver} );
+    return unless ( $this->{params}->{destinationftpserver} );
 
-    my $localfilePath = "$this->{path}/$this->{web}/$to";
+    my $localfilePath = "$this->{path}/$to";
 
     my $attempts = 0;
     my $ftp;
@@ -92,7 +97,7 @@ sub _upload {
                   or die "Cannot create directory ", $ftp->message;
             }
 
-            if ( $this->{fastupload} ) {
+            if ( $this->{params}->{fastupload} ) {
 
                 # Calculate checksum for local file
                 my $fh;
@@ -138,7 +143,7 @@ sub _upload {
 
             $ftp->put( $localfilePath, $to )
               or die "put failed ", $ftp->message;
-            $this->{logger}->logInfo("FTPed","$to to $this->{destinationftpserver}");
+            $this->{logger}->logInfo("FTPed","$to to $this->{params}->{destinationftpserver}");
             $attempts = 2;
         };
 
@@ -165,20 +170,20 @@ sub _ftpConnect {
     if ( !$this->{ftp_interface} ) {
         require Net::FTP;
         my $ftp = Net::FTP->new(
-            $this->{destinationftpserver},
+            $this->{params}->{destinationftpserver},
             Debug   => 1,
             Timeout => 30,
             Passive => 1
-        ) or die "Cannot connect to $this->{destinationftpserver}: $@";
-        $ftp->login( $this->{destinationftpusername},
-            $this->{destinationftppassword} )
+        ) or die "Cannot connect to $this->{params}->{destinationftpserver}: $@";
+        $ftp->login( $this->{params}->{destinationftpusername},
+            $this->{params}->{destinationftppassword} )
           or die "Cannot login ", $ftp->message;
 
         $ftp->binary();
 
-        if ( $this->{destinationftppath} ne '' ) {
-            $ftp->mkdir( $this->{destinationftppath}, 1 );
-            $ftp->cwd( $this->{destinationftppath} )
+        if ( $this->{params}->{destinationftppath} ne '' ) {
+            $ftp->mkdir( $this->{params}->{destinationftppath}, 1 );
+            $ftp->cwd( $this->{params}->{destinationftppath} )
               or die "Cannot change working directory ", $ftp->message;
         }
         $this->{ftp_interface} = $ftp;
@@ -191,8 +196,8 @@ sub close {
 
     my $landed = $this->SUPER::close();
 
-    if ( $this->{destinationftpserver} ) {
-        $landed = $this->{destinationftpserver};
+    if ( $this->{params}->{destinationftpserver} ) {
+        $landed = $this->{params}->{destinationftpserver};
         $this->{ftp_interface}->quit() if $this->{ftp_interface};
         $this->{ftp_interface} = undef;
     }

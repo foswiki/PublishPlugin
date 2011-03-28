@@ -26,14 +26,14 @@ my %parameters = (
     history          => { default => 'PublishPluginHistory',
                           validator => \&_validateTopic },
     inclusions       => { default  => '.*', validator => \&_wildcard2RE },
-    publishskin      => { },
+    publishskin      => { validator => \&_validateWord },
     relativedir      => { default => '', validator => \&_validateRelPath },
     templates        => { default => 'view', validator => \&_validateList },
     topiclist        => { default  => '',
 			  allowed_macros => 1,
 			  validator => \&_validateList },
-    topicsearch      => { default => '' },
-    versions         => { },
+    topicsearch      => { default => '', validator => \&_validateRE },
+    versions         => { validator => \&_validateList },
 
     filter           => { renamed => 'topicsearch' },
     instance         => { renamed => 'relativedir' },
@@ -46,6 +46,13 @@ sub _wildcard2RE {
     $v =~ s/([*?])/.$1/g;
     $v =~ s/,/|/g;
     return $v;
+}
+
+sub _validateRE {
+    my $v = shift;
+    # SMELL: do a much better job of this!
+    $v =~ /^(.*)$/;
+    return $1;
 }
 
 sub _validateDir {
@@ -89,6 +96,15 @@ sub _validateWord {
     die "Invalid $k: '$v'";
 }
 
+sub validateFilename {
+    my $v = shift;
+    if ($v =~ /^([\w ]+)$/ ) {
+        return $1;
+    }
+    my $k = shift;
+    die "Invalid $k: '$v'";
+}
+
 sub _validateRelPath {
     my $v = shift;
     $v .= '/';
@@ -122,18 +138,47 @@ sub new {
         $class
     );
     my $query = Foswiki::Func::getCgiQuery();
+    my $data;
     if ( $query && $query->param('configtopic') ) {
         $this->{configtopic} = $query->param('configtopic');
         $query->delete('configtopic');
-        $this->_configureFromTopic();
+        $data = $this->_loadConfigTopic();
     }
     elsif ($query) {
-        $this->_configureFromQuery($query);
+        $data = $query->Vars;
     }
-    foreach my $p ( keys %parameters ) {
-        next if defined $this->{$p};
-        $this->{$p} = $parameters{$p}->{default} || '';
+
+    # Try and build the generator first, so we can pull in param defs
+    $data->{format} ||= 'file';
+    die "Bad format" unless $data->{format} =~ /^(\w+)$/;
+    $this->{generator} =
+	'Foswiki::Plugins::PublishPlugin::' . $1;
+    eval 'use ' . $this->{generator};
+    
+    if ($@) {
+	die "Failed to initialise '$data->{format}' generator: $@";
     }
+
+    foreach my $phash (\%parameters, $this->{generator}->param_schema()) {
+	foreach my $k (keys %$phash) {
+	    if ( defined( $data->{$k} ) ) {
+		my $v = $data->{$k};
+		$this->_setArg($k, $v, $phash);
+		$query->delete( $k ) if $query;
+	    } else {
+		$this->{$k} = $phash->{$k}->{default};
+	    }
+	}
+    }
+
+    # 'compress' undocumented but retained for compatibility
+    if ( $query && defined $query->param('compress') ) {
+        my $v = $query->param('compress');
+        if ( $v =~ /(\w+)/ ) {
+            $this->{format} = $1;
+        }
+    }
+    
     $this->{publishskin} ||=
       Foswiki::Func::getPreferencesValue('PUBLISHSKIN') || 'basic_publish';
     return $this;
@@ -145,20 +190,21 @@ sub finish {
 }
 
 sub _setArg {
-    my ($this, $k, $v) = @_;
-    $k = $parameters{$k}->{renamed}
-      if defined $parameters{$k}->{renamed};
-    if (defined $parameters{$k}->{allowed_macros}) {
+    my ($this, $k, $v, $phash) = @_;
+    $k = $phash->{$k}->{renamed}
+      if defined $phash->{$k}->{renamed};
+    if (defined $phash->{$k}->{allowed_macros}) {
 	$v = Foswiki::Func::expandCommonVariables($v);
     }
-    if (defined $parameters{$k}->{validator}) {
-        $this->{$k} = &{$parameters{$k}->{validator}}($v, $k);
+    if (defined $phash->{$k}->{validator}) {
+        $this->{$k} = &{$phash->{$k}->{validator}}($v, $k);
     } else {
+#	die "Unvalidated $k\n";
         $this->{$k} = $v;
     }
 }
 
-sub _configureFromTopic {
+sub _loadConfigTopic {
     my ($this) = @_;
 
     # Parameters are defined in config topic
@@ -185,6 +231,7 @@ sub _configureFromTopic {
         $this->{web}, $cfgm );
 
     # SMELL: common preferences parser?
+    my %data;
     foreach my $line ( split( /\r?\n/, $cfgt ) ) {
         next
           unless $line =~
@@ -193,31 +240,9 @@ sub _configureFromTopic {
         my $k = lc($1);
         my $v = $2;
 
-        if (defined $parameters{$k}) {
-            $this->_setArg($k, $v);
-        }
+        $data{$k} = $v;
     }
-}
-
-sub _configureFromQuery {
-    my ( $this, $query ) = @_;
-
-    # Parameters are defined in the query
-    foreach my $k (keys %parameters) {
-        if ( defined( $query->param($k) ) ) {
-            my $v = $query->param($k);
-            $this->_setArg($k, $v);
-            $query->delete( $k );
-        }
-    }
-
-    # 'compress' undocumented but retained for compatibility
-    if ( defined $query->param('compress') ) {
-        my $v = $query->param('compress');
-        if ( $v =~ /(\w+)/ ) {
-            $this->{format} = $1;
-        }
-    }
+    return \%data;
 }
 
 sub publishWeb {
@@ -297,6 +322,7 @@ TEXT
     $this->logInfo( "Config topic",      $this->{configtopic} )
       if $this->{configtopic};
     $this->logInfo( "Skin",              $this->{publishskin} );
+    $this->logInfo( "Templates",         $this->{templates} );
     $this->logInfo( "Topic list",        $this->{topiclist} );
     $this->logInfo( "Inclusions",        $this->{inclusions} );
     $this->logInfo( "Exclusions",        $this->{exclusions} );
@@ -350,23 +376,9 @@ TEXT
 
         File::Path::mkpath($dir);
 
-        my $generator =
-          'Foswiki::Plugins::PublishPlugin::' . $this->{format};
-        eval 'use ' . $generator;
-        unless ($@) {
-            eval {
-                $this->{archive} =
-                  $generator->new( $dir, $this->{web}, $this->{extras}, $this,
-                    Foswiki::Func::getCgiQuery() );
-            };
-        }
-        if ( $@ || ( !$this->{archive} ) ) {
-            $this->logError(<<ERROR, $footer);
-Failed to initialise '$this->{format}' ($generator) generator:
-<pre>$@</pre>
-ERROR
-            return;
-        }
+	$this->{archive} =
+	    $this->{generator}->new( $this, $dir, $this );
+
         $this->publishUsingTemplate($template);
 
         my $landed = $this->{archive}->close();
@@ -488,7 +500,7 @@ sub logError {
 sub publishUsingTemplate {
     my ( $this, $template ) = @_;
 
-    # Get list of topics from this web.
+    # Get list of topics
     my @topics;
 
     if ($this->{topiclist}) {
@@ -510,7 +522,7 @@ sub publishUsingTemplate {
     my %copied;
     foreach my $topic (@topics) {
         next if $topic eq $this->{history};    # never publish this
-	$topic =~ s/^$this->{web}\.//;
+	(my $web, $topic) = Foswiki::Func::normalizeWebTopicName($this->{web}, $topic);
         try {
             my $dispo = '';
             if ( $this->{inclusions} && $topic !~ /^($this->{inclusions})$/ ) {
@@ -523,19 +535,19 @@ sub publishUsingTemplate {
             }
             else {
                 my $rev =
-                  $this->publishTopic( $topic, $filetype, $template, $tmpl,
+                  $this->publishTopic( $web, $topic, $filetype, $template, $tmpl,
                     \%copied )
                   || '0';
                 $dispo = "Rev $rev published";
                 $topic = '<a href="'.Foswiki::Func::getScriptUrl(
-                    $this->{web}, $topic, 'view', rev=>$rev).'">'
+                    $web, $topic, 'view', rev=>$rev).'">'
                       .$topic.'</a>';
             }
             $this->logInfo( $topic, $dispo );
         }
         catch Error::Simple with {
             my $e = shift;
-            $this->logError( "$topic not published: " . ( $e->{-text} || '' ) );
+            $this->logError( "$web.$topic not published: " . ( $e->{-text} || '' ) );
         };
 
         # Prevent slowdown and unnecessary memory use if templates are 
@@ -569,17 +581,17 @@ sub publishUsingTemplate {
 
 #   * =\%copied= - map of copied resources to new locations
 sub publishTopic {
-    my ( $this, $topic, $filetype, $template, $tmpl, $copied ) = @_;
+    my ( $this, $w, $t, $filetype, $template, $tmpl, $copied ) = @_;
 
     # Read topic data.
 
     my ( $meta, $text );
     my $publishedRev =
         $this->{topicVersions}
-      ? $this->{topicVersions}->{$topic}
+      ? $this->{topicVersions}->{"$w.$t"}
       : undef;
-    my ($w, $t) = Foswiki::Func::normalizeWebTopicName($this->{web}, $topic);
-    $topic = "$w.$t";
+
+    my $topic = "$w.$t";
 
     ( $meta, $text ) =
       Foswiki::Func::readTopic( $w, $t, $publishedRev );
@@ -702,7 +714,8 @@ sub publishTopic {
     # it around newlines.
     $text = "\n$text" unless $text =~ /^\n/s;
     
-    $tmpl = Foswiki::Plugins::PublishPlugin::PageAssembler::assemblePage($this, $tmpl, $text);
+    $tmpl = Foswiki::Plugins::PublishPlugin::PageAssembler::assemblePage(
+	$this, $tmpl, $text);
     
     # legacy
     $tmpl =~ s/<nopublish>.*?<\/nopublish>//gs;
@@ -724,7 +737,8 @@ sub publishTopic {
         # when dispatching completePageHandler.
         my $CRLF   = "\x0D\x0A";
         my $hdr = "Content-type: text/html$CRLF$CRLF";
-        $Foswiki::Plugins::SESSION->{plugins}->dispatch( 'completePageHandler', $tmpl, $hdr );
+        $Foswiki::Plugins::SESSION->{plugins}->dispatch(
+	    'completePageHandler', $tmpl, $hdr );
     }
 
     $tmpl =~ s|( ?) *</*nop/*>\n?|$1|gois;
@@ -775,7 +789,8 @@ sub publishTopic {
     $tmpl =~ s/<nop>//g;
 
     # Write the resulting HTML.
-    $this->{archive}->addString( $tmpl, $topic . $filetype );
+    $w =~ s#\.#/#g;
+    $this->{archive}->addString( $tmpl, "$w/$t$filetype" );
 
     if ( defined &Foswiki::Func::popTopicContext ) {
         Foswiki::Func::popTopicContext( );
