@@ -27,8 +27,9 @@ use Assert;
 
 sub new {
     my $class = shift;
+    my ($params) = @_;
+    $params->{outfile} ||= "tgz";
     my $this = $class->SUPER::new(@_);
-    $this->{params}->{outfile} ||= "tgz";
 
     require Archive::Tar;
     $this->{tar} = Archive::Tar->new();

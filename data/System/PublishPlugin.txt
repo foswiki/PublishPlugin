@@ -284,7 +284,7 @@ table.publishForm .paramCol {
   <tr>
     <td class="nameCol">Output format</td>
     <td class="inputCol">
-      <select name="format" id="selectedFormat" class="foswikiSelect" onchange="showPublishOptions()">
+      <select name="format" id="selectedFormat" class="foswikiSelect">
 	<option>file</option>
 	<option>zip</option>
 	<option>tgz</option>
@@ -331,7 +331,7 @@ table.publishForm .paramCol {
 	    <input type="text" size="30" name="outfile" value="" class="foswikiInputField" title="Defaults to the name of the generator" />
 	  </td>
 	  <td class="infoCol">
-	    Specify the name of the target output file (or directory), used when the output is going to a files e.g. file, pdf, zip, tgz
+	    Specify the root of the target output file name. For example, if this is set to =news= and you publish to PDF, the output will be in =news.pdf=. When publishing to HTML, this will be used as the name of the subdirectory where the HTML will be stored. The default is to use the name of the format e.g. =pdf.pdf=. 
 	  </td>
 	  <td class="paramCol">
 	    =outfile=
@@ -364,17 +364,31 @@ table.publishForm .paramCol {
 	</tr>
 	<tr class="expert" class="publishOptionsSet fileOptions ftpOptions">
 	  <td class="nameCol">
-	    Relative directory
+	    Extended directory path
 	  </td>
 	  <td class="inputCol">
 	    <input type="text" size="30" name="relativedir" value="/" class="foswikiInputField" title="Use / to publish directly in {PublishPlugin}{Dir}" />
 	  </td>
 	  <td class="infoCol">
 	    Path of a directory relative to ={PublishPlugin}{Dir}= where you want the output generated. '/' means generate the output directly in
-	    ={PublishPlugin}{Dir}=.
+	    ={PublishPlugin}{Dir}=. This allows you to keep different publishings of the same content separated.
 	  </td>
 	  <td class="paramCol">
 	    =relativedir=
+	  </td>
+	</tr>
+	<tr class="expert" class="publishOptionsSet fileOptions ftpOptions">
+	  <td class="nameCol">
+	    Resource Directory
+	  </td>
+	  <td class="inputCol">
+	    <input type="text" size="30" name="rsrcdir" value="rsrc" class="foswikiInputField" title="Directory relative to the root of your site"" />
+	  </td>
+	  <td class="infoCol">
+	    When publishing to HTML, attachments, icons, etc, are output to this directory. The directory name is relative to the root of your published site.
+	  </td>
+	  <td class="paramCol">
+	    =rsrcdir=
 	  </td>
 	</tr>
 	<tr class="expert" class="publishOptionsSet fileOptions ftpOptions">
@@ -641,7 +655,7 @@ This add-on started life as the !GenHTMLAddon, written by Foswiki:Main/CrawfordC
 |  Version: | %$VERSION% |
 |  Release: | %$RELEASE% |
 |  Change History: | |
-|  2.2.1 (25 May 2011) | Foswiki:Tasks/Item10578: allow list of publishskins; Foswiki:Tasks/Item10580: allow empty outfile param; Foswiki:Tasks/Item10585: support all valid topic names in topiclist; Foswiki:Tasks/Item10578: made template purging configurable Foswiki:Tasks/Item10594: merged DiabJerius' patch |
+|  2.2.1 (25 May 2011) | Foswiki:Tasks/Item10578: allow list of publishskins; Foswiki:Tasks/Item10580: allow empty outfile param; Foswiki:Tasks/Item10585: support all valid topic names in topiclist; Foswiki:Tasks/Item10578: made template purging configurable Foswiki:Tasks/Item10594: merged patch; Foswiki:Tasks/Item10581: correct paths to resources in HTML output. (Diab Jerius and Crawford Currie) |
 |  2.2.0 (28 Mar 2011) | Foswiki:Tasks/Item8225: fix handling of plugin contexts Item2635: make sure index.html is generated Foswiki:Tasks/Item10529: test integration with BookmakerPlugin via new topiclist parameter |
 |  2.1.7 (01 Nov 2010) | Foswikitask:Item8658: fix rest output when publishing to file, pdf and ftp |
 |  2.1.6 (29 Oct 2010) | Foswikitask:Item8522: support for Foswiki 1.1.x and also 1.0.x+Zone<nop>Plugin Foswikitask:Item1638: fixed finding resources with parameters (e.g. =?t=2365421=) |

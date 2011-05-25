@@ -25,8 +25,9 @@ use File::Path;
 
 sub new {
     my $class = shift;
+    my ($params) = @_;
+    $params->{outfile} ||= "pdf";
     my $this = $class->SUPER::new(@_);
-    $this->{params}->{outfile} ||= "pdf";
     return $this;
 }
 
@@ -47,7 +48,7 @@ sub close {
     eval { File::Path::mkpath($dir) };
     die $@ if ($@);
 
-    my @files = map { "$this->{path}/$_" }
+    my @files = map { "$dir$this->{params}->{outfile}/$_" }
       grep { /\.html$/ } @{ $this->{files} };
 
     my $cmd = $Foswiki::cfg{PublishPlugin}{PDFCmd};

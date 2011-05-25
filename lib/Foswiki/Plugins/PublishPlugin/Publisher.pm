@@ -24,21 +24,30 @@ my %parameters = (
     exclusions       => { default  => '', validator => \&_wildcard2RE },
     format           => { default => 'file', validator => \&_validateWord },
     history          => { default => 'PublishPluginHistory',
-                          validator => \&_validateTopic },
+			  validator => \&_validateTopic },
     inclusions       => { default  => '.*', validator => \&_wildcard2RE },
     publishskin      => { validator => \&_validateList },
     relativedir      => { default => '', validator => \&_validateRelPath },
+    rsrcdir          => { default => 'rsrc',
+			  validator => sub { 
+                              my ( $v, $k ) = @_;
+                              $v = _validateRelPath($v, $k);
+                              die "Invalid $k: '$v'" if $v =~ /^\./;
+                              return "/$v";
+			  }
+    },
     templates        => { default => 'view', validator => \&_validateList },
     topiclist        => { default  => '',
 			  allowed_macros => 1,
 			  validator => \&_validateTopicList },
     topicsearch      => { default => '', validator => \&_validateRE },
     versions         => { validator => \&_validateList },
-
+    
+    # Renamed options
     filter           => { renamed => 'topicsearch' },
     instance         => { renamed => 'relativedir' },
     genopt           => { renamed => 'extras' },
-    skin             => { renamed => 'publishskin' },
+    skin             => { renamed => 'publishskin' }
 );
 
 sub _wildcard2RE {
@@ -771,7 +780,7 @@ sub publishTopic {
     # Find and copy resources attached to the topic
     my $pub = Foswiki::Func::getPubUrlPath();
     $tmpl =~ s!(['"\(])($Foswiki::cfg{DefaultUrlHost}|https?://$hs)?$pub/(.*?)(\1|\))!
-      $1.$this->_copyResource($3, $copied).$4!ge;
+      $1.$this->_rsrcpath( "/$w" ,$this->_copyResource($3, $copied) ).$4!ge;
 
     my $ilt;
 
@@ -796,7 +805,7 @@ sub publishTopic {
 
     # Handle image tags using absolute URLs not otherwise satisfied
     $tmpl =~ s!(<img\s+.*?\bsrc=)(["'])(.*?)\2(.*?>)!
-      $1.$2.$this->_handleURL($3,\($this->{nextExternalResourceNumber})).$2.$4!ge;
+      $1.$2.$this->_rsrcpath( "/$w",$this->_handleURL($3,\($this->{nextExternalResourceNumber})) ).$2.$4!ge;
 
     $tmpl =~ s/<nop>//g;
 
@@ -916,9 +925,9 @@ sub _copyResource {
         my $pubDir = Foswiki::Func::getPubDir();
         my $src = "$pubDir/$bareRsrcName";
         if ( -r "$pubDir/$bareRsrcName" ) {
-            $this->{archive}->addDirectory("rsrc");
-            $this->{archive}->addDirectory("rsrc/$path");
-            my $dest = "rsrc/$path/$file";
+            $this->{archive}->addDirectory($this->{rsrcdir});
+            $this->{archive}->addDirectory("$this->{rsrcdir}/$path");
+            my $dest = "$this->{rsrcdir}/$path/$file";
             $dest =~ s!//!/!g;
             if ( -d $src) {
                 $this->{archive}->addDirectory( $src, $dest );
@@ -1030,10 +1039,11 @@ sub _handleURL {
     # Note: no extension; rely on file format.
     # Images are pretty good that way.
     my $file = '___extra' . $$extras++;
-    $this->{archive}->addDirectory("rsrc");
-    $this->{archive}->addString( $data, "rsrc/$file" );
+    $this->{archive}->addDirectory($this->{rsrcdir});
 
-    return 'rsrc/' . $file;
+    my $fpath = "$this->{rsrcdir}/$file";
+    $this->{archive}->addString( $data, $fpath );
+    return $fpath;
 }
 
 # Returns a pattern that will match the HTML used to represent an
@@ -1044,6 +1054,28 @@ sub _handleNewLink {
     $link =~ s!<a .*?>!!gi;
     $link =~ s!</a>!!gi;
     return $link;
+}
+
+
+# return a relative path to a resource given a location to a resource
+# and the path to the current output directory.  the various stages of
+# cleanup may cause a path to get run through this function multiple
+# times; make sure that we only modify the path the first time.
+sub _rsrcpath {
+
+    my ( $this, $odir, $rsrcloc ) = @_;
+
+    # if path is already relative, return it
+    return $rsrcloc if $rsrcloc =~ m{^\.+/};
+
+    # relative path to rsrc dir from output dir
+    my $nloc = File::Spec->abs2rel($rsrcloc,$odir);
+
+    # ensure there's an explicit relative path so it can
+    # be identified next time 'round
+    $nloc = './' . $nloc unless $nloc =~ /^\./;
+
+    return $nloc;
 }
 
 1;

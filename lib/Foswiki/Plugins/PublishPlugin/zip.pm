@@ -26,8 +26,9 @@ use File::Path;
 
 sub new {
     my $class = shift;
+     my ($params) = @_;
+    $params->{outfile} ||= "zip";
     my $this = $class->SUPER::new(@_);
-    $this->{params}->{outfile} ||= "zip";
 
     eval 'use Archive::Zip qw( :ERROR_CODES :CONSTANTS )';
     die $@ if $@;
