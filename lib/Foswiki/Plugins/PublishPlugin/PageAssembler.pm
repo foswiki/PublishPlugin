@@ -79,8 +79,6 @@ sub _noHeadOrScriptZones
 {
     my $publisher = shift;
     my $tmpl = shift;
-    my $text = shift;
-    $tmpl =~ s/%TEXT%/$text/;
     return $tmpl;
 }
 
@@ -89,20 +87,35 @@ sub _foswiki1x0NoZonePlugin
 {
     my $publisher = shift;
     my $tmpl = shift;
-    my $text = shift;
-    my ( $header, $footer ) = split( /%TEXT%/, $tmpl );
     my $addedToHead = $Foswiki::Plugins::SESSION->RENDERHEAD();
-    $header =~ s/(<\/head>)/$addedToHead$1/;
-    $tmpl = $header . $text . $footer;
+    $tmpl =~ s/(<\/head>)/$addedToHead$1/;
+    return $tmpl;
 }
 
 sub _foswiki1x1
 {
     my $publisher = shift;
     my $tmpl = shift;
-    my $text = shift;
-    $tmpl =~ s/%TEXT%/$text/;
-    return $Foswiki::Plugins::SESSION->_renderZones($tmpl);
+
+    # nasty kludge. backup zone content for plugins which only call
+    # addToZone during plugin initialization.  _renderZones deletes
+    # the zone content and subsequent published topics will be missing
+    # that content
+    my $this = $Foswiki::Plugins::SESSION;
+    my %zones;
+    while( my ( $zoneName, $zone ) = each %{ $this->{_zones} } )
+    {
+	$zones{$zoneName} = {};
+
+	$zones{$zoneName}{$_} = $zone->{$_} 
+	  foreach grep { /^JQUERYPLUGIN::/ } keys %$zone;
+    }
+
+    my $result = $Foswiki::Plugins::SESSION->_renderZones($tmpl);
+
+    $this->{_zones}{$_} = $zones{$_} for keys %zones;
+
+    return $result;
 }
 
 1;

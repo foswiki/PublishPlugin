@@ -724,8 +724,7 @@ sub publishTopic {
     # it around newlines.
     $text = "\n$text" unless $text =~ /^\n/s;
     
-    $tmpl = Foswiki::Plugins::PublishPlugin::PageAssembler::assemblePage(
-	$this, $tmpl, $text);
+    $tmpl =~ s/%TEXT%/$text/;
     
     # legacy
     $tmpl =~ s/<nopublish>.*?<\/nopublish>//gs;
@@ -740,6 +739,9 @@ sub publishTopic {
     $tmpl =~ s/[[:space:]]+$//s;    # trim at end
 
     $tmpl = Foswiki::Func::renderText( $tmpl, $w );
+
+    $tmpl = Foswiki::Plugins::PublishPlugin::PageAssembler::assemblePage(
+	$this, $tmpl);
 
     if ($Foswiki::Plugins::VERSION and $Foswiki::Plugins::VERSION >= 2.0)
     {
