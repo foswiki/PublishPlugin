@@ -31,7 +31,7 @@ my %parameters = (
     templates        => { default => 'view', validator => \&_validateList },
     topiclist        => { default  => '',
 			  allowed_macros => 1,
-			  validator => \&_validateList },
+			  validator => \&_validateTopicList },
     topicsearch      => { default => '', validator => \&_validateRE },
     versions         => { validator => \&_validateList },
 
@@ -74,6 +74,15 @@ sub _validateList {
     die "Invalid $k: '$v'";
 }
 
+sub _validateTopicList {
+    my ($v, $k) = @_;
+    my @ts;
+    foreach my $t (split(/\s*,\s*/, $v)) {
+	push(@ts, _validateTopic($t, $k));
+    }
+    return join(',', @ts);
+}
+
 sub _validateTopic {
     my $v = shift;
     unless (defined &Foswiki::Func::isValidTopicName) {
@@ -98,7 +107,7 @@ sub _validateWord {
 
 sub validateFilename {
     my $v = shift;
-    if ($v =~ /^([\w ]+)$/ ) {
+    if ($v =~ /^([\w ]*)$/ ) {
         return $1;
     }
     my $k = shift;
