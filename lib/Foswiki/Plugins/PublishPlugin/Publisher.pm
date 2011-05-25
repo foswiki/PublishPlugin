@@ -26,7 +26,7 @@ my %parameters = (
     history          => { default => 'PublishPluginHistory',
                           validator => \&_validateTopic },
     inclusions       => { default  => '.*', validator => \&_wildcard2RE },
-    publishskin      => { validator => \&_validateWord },
+    publishskin      => { validator => \&_validateList },
     relativedir      => { default => '', validator => \&_validateRelPath },
     templates        => { default => 'view', validator => \&_validateList },
     topiclist        => { default  => '',
