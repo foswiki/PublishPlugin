@@ -50,7 +50,6 @@ sub param_schema {
 	},
 	googlefile  => {},
 	defaultpage => { default => 'WebHome' },
-	relativeurl => { default => '/' },
 	%{$class->SUPER::param_schema}
     };
 }

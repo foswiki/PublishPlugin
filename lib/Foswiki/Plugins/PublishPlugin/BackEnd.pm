@@ -54,7 +54,9 @@ Get schema of query parameters, in the same format as Publisher.pm
 =cut
 
 sub param_schema {
-    return {};
+    return {
+	relativeurl => { default => '/' },
+    };
 }
 
 =begin TML
