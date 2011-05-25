@@ -571,10 +571,11 @@ sub publishUsingTemplate {
         # Sure - the publishing configuration should be fixed,
         # but it can be tricky to debug that configuration if Apache is
         # killing the publishing process.
-        if ($Foswiki::Plugins::SESSION->can('templates') and
+        if ($Foswiki::cfg{PublishPlugin}{PurgeTemplates} &&
+	    $Foswiki::Plugins::SESSION->can('templates') and
             $Foswiki::Plugins::SESSION->{templates} and
             ref $Foswiki::Plugins::SESSION->{templates} and
-            $Foswiki::Plugins::SESSION->{templates}->can('finish') )
+            $Foswiki::Plugins::SESSION->{templates}->can('finish'))
         {
             $Foswiki::Plugins::SESSION->{templates}->finish();
             undef $Foswiki::Plugins::SESSION->{templates};
