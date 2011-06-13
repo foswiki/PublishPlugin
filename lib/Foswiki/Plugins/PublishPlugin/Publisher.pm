@@ -26,6 +26,7 @@ my %parameters = (
     history          => { default => 'PublishPluginHistory',
 			  validator => \&_validateTopicName },
     inclusions       => { default  => '.*', validator => \&_wildcard2RE },
+    preferences      => { default => '' },
     publishskin      => { validator => \&_validateList },
     relativedir      => { default => '', validator => \&_validateRelPath },
     rsrcdir          => { default => 'rsrc',
@@ -231,10 +232,10 @@ sub _setArg {
 	$this->{$k} = $spec->{default};
     } elsif (defined $spec->{validator}) {
         $this->{$k} = &{$spec->{validator}}($v, $k);
+	ASSERT(UNTAINTED($this->{$k}), $k) if DEBUG;
     } else {
         $this->{$k} = $v;
     }
-    ASSERT(UNTAINTED($this->{$k}), $k) if DEBUG;
 }
 
 sub _loadConfigTopic {
@@ -353,6 +354,17 @@ TEXT
     $this->logInfo( "Config topic",      $this->{configtopic} )
       if $this->{configtopic};
     $this->logInfo( "Skin",              $this->{publishskin} );
+    # Push preference values. Because we use session preferences (preferences
+    # that only live as long as the request) these values will not persist.
+    if ($this->{preferences}) {
+	foreach my $setting (split(/\r?\n/, $this->{preferences})) {
+	    if ($setting =~ /^(\w+)\s*=(.*)$/) {
+		my ($k, $v) = ($1, $2);
+		Foswiki::Func::setPreferencesValue($k, $v);
+		$this->logInfo( "Preference", "$k=$v" );
+	    }
+	}
+    }
     $this->logInfo( "Templates",         $this->{templates} );
     $this->logInfo( "Topic list",        $this->{topiclist} );
     $this->logInfo( "Inclusions",        $this->{inclusions} );
@@ -442,8 +454,10 @@ BLAH
     # reasons, Func::readTemplate doesn't distinguish between no template
     # and an empty template :-(
     if ($history) {
-	$history = Foswiki::Func::expandVariablesOnTopicCreation( $history );
-	$history =~ s/%HISTORY%/$this->{historyText}/g;
+	# Expand macros *before* we include the history text so we pick up
+	# session preferences.
+	Foswiki::Func::setPreferencesValue('PUBLISHING_HISTORY', $this->{historyText});
+	$history = Foswiki::Func::expandCommonVariables( $history );
     } elsif (Foswiki::Func::topicExists($hw, $ht)) {
 	# No template, use the last publish run (legacy)
 	$text ||= '';
