@@ -87,6 +87,7 @@ sub _display {
 
 # Allow manipulation of $Foswiki::cfg{PublishPlugin}{Dir}
 sub _publishControlCentre {
+    my ($session, $params, $topic, $web, $topicObject) = @_;
 
     my $query = Foswiki::Func::getCgiQuery();
 
@@ -104,6 +105,7 @@ This interface lets you perform basic management operations
 on published output files and directories. Click on the name of the
 output file to visit it.
 HERE
+    $output .= $query->Dump() if DEBUG;
     my $action = $query->param('action') || '';
     $query->delete('action');    # delete so we can redefine them
     my $file = $query->param('file');
@@ -111,21 +113,26 @@ HERE
 
     if ( $action eq 'delete' ) {
         $file =~ m#([\w./\\]+)#;    # untaint
-        File::Path::rmtree("$Foswiki::cfg{PublishPlugin}{Dir}/$1");
-        $output .= CGI::p("$1 deleted");
+	if (-e "$Foswiki::cfg{PublishPlugin}{Dir}/$1") {
+	    File::Path::rmtree("$Foswiki::cfg{PublishPlugin}{Dir}/$1");
+	    $output .= CGI::p("$1 deleted");
+	} else {
+	    $output .= CGI::p("Cannot delete $1 - no such file");
+	}
     }
     if ( opendir( D, $Foswiki::cfg{PublishPlugin}{Dir} ) ) {
         my @files = grep( !/^\./, readdir(D) );
         if ( scalar(@files) ) {
             $output .= CGI::start_table();
-            foreach my $file (@files) {
+            foreach $file (@files) {
                 my $link = "$Foswiki::cfg{PublishPlugin}{URL}/$file";
                 $link = CGI::a( { href => $link }, $file );
                 my @cols   = ( CGI::th($link) );
                 my $delcol = CGI::start_form(
                     {
-                        action => '',
-                        method => 'GET',
+                        action => Foswiki::Func::getScriptUrl(
+			    $web, $topic, 'view'),
+                        method => 'POST',
                         name   => $file
                     }
                 );
@@ -135,10 +142,9 @@ HERE
                         name => 'Delete'
                     }
                 );
-                $delcol .= CGI::hidden( 'file',    $file );
-                $delcol .= CGI::hidden( 'action',  'delete' );
-                $delcol .= CGI::hidden( 'control', '1' );
-                $delcol .= CGI::hidden('skin');
+                $delcol .= "<input type='hidden' name='file' value='$file'/>";
+                $delcol .= "<input type='hidden' name='action' value='delete' />";
+                $delcol .= "<input type='hidden' name='control' value='1' />";
                 $delcol .= CGI::end_form();
                 push( @cols, $delcol );
                 $output .= CGI::Tr( { valign => "baseline" },
