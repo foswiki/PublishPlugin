@@ -24,7 +24,7 @@ my %parameters = (
     exclusions       => { default  => '', validator => \&_wildcard2RE },
     format           => { default => 'file', validator => \&_validateWord },
     history          => { default => 'PublishPluginHistory',
-			  validator => \&_validateTopic },
+			  validator => \&_validateTopicName },
     inclusions       => { default  => '.*', validator => \&_wildcard2RE },
     publishskin      => { validator => \&_validateList },
     relativedir      => { default => '', validator => \&_validateRelPath },
@@ -39,7 +39,7 @@ my %parameters = (
     templates        => { default => 'view', validator => \&_validateList },
     topiclist        => { default  => '',
 			  allowed_macros => 1,
-			  validator => \&_validateTopicList },
+			  validator => \&_validateTopicNameList },
     topicsearch      => { default => '', validator => \&_validateRE },
     versions         => { validator => \&_validateList },
     
@@ -54,7 +54,7 @@ sub _wildcard2RE {
     my $v = shift;
     $v =~ s/([*?])/.$1/g;
     $v =~ s/,/|/g;
-    return $v;
+    return _validateRE($v, @_);
 }
 
 sub _validateRE {
@@ -83,16 +83,16 @@ sub _validateList {
     die "Invalid $k: '$v'";
 }
 
-sub _validateTopicList {
+sub _validateTopicNameList {
     my ($v, $k) = @_;
     my @ts;
     foreach my $t (split(/\s*,\s*/, $v)) {
-	push(@ts, _validateTopic($t, $k));
+	push(@ts, _validateTopicName($t, $k));
     }
     return join(',', @ts);
 }
 
-sub _validateTopic {
+sub _validateTopicName {
     my $v = shift;
     unless (defined &Foswiki::Func::isValidTopicName) {
         # Old code doesn't have this. Caveat emptor.
@@ -114,6 +114,15 @@ sub _validateWord {
     die "Invalid $k: '$v'";
 }
 
+sub validateFilenameList {
+    my ($v, $k) = @_;
+    my @ts;
+    foreach my $t (split(/\s*,\s*/, $v)) {
+	push(@ts, _validateFilename($t, $k));
+    }
+    return join(',', @ts);
+}
+
 sub validateFilename {
     my $v = shift;
     if ($v =~ /^([\w ]*)$/ ) {
@@ -129,7 +138,8 @@ sub _validateRelPath {
     $v =~ s#//+#/#;
     $v =~ s#^/##;
     if ($v =~ m#^(.*)$# ) {
-        return $1;
+	my $d = $1;
+        return $d;
     }
     my $k = shift;
     die "Invalid $k: '$v'";
@@ -199,6 +209,8 @@ sub new {
     
     $this->{publishskin} ||=
       Foswiki::Func::getPreferencesValue('PUBLISHSKIN') || 'basic_publish';
+
+    $this->{historyText} = '';
     return $this;
 }
 
@@ -209,17 +221,20 @@ sub finish {
 
 sub _setArg {
     my ($this, $k, $v, $phash) = @_;
-    $k = $phash->{$k}->{renamed}
-      if defined $phash->{$k}->{renamed};
-    if (defined $phash->{$k}->{allowed_macros}) {
+    my $spec = $phash->{$k};
+    $k = $spec->{renamed}
+      if defined $spec->{renamed};
+    if (defined $spec->{allowed_macros}) {
 	$v = Foswiki::Func::expandCommonVariables($v);
     }
-    if (defined $phash->{$k}->{validator}) {
-        $this->{$k} = &{$phash->{$k}->{validator}}($v, $k);
+    if ($spec->{default} && $v eq $spec->{default}) {
+	$this->{$k} = $spec->{default};
+    } elsif (defined $spec->{validator}) {
+        $this->{$k} = &{$spec->{validator}}($v, $k);
     } else {
-#	die "Unvalidated $k\n";
         $this->{$k} = $v;
     }
+    ASSERT(UNTAINTED($this->{$k}), $k) if DEBUG;
 }
 
 sub _loadConfigTopic {
@@ -292,8 +307,7 @@ sub publishWeb {
     }
 
     my ( $hw, $ht ) =
-      Foswiki::Func::normalizeWebTopicName( $this->{web},
-        $this->{history} );
+      Foswiki::Func::normalizeWebTopicName( $this->{web}, $this->{history} );
     unless (
         Foswiki::Func::checkAccessPermission(
             'CHANGE', Foswiki::Func::getWikiName(),
@@ -308,8 +322,7 @@ This topic must be editable by the user doing the publishing.
 TEXT
         return;
     }
-    $this->{historyWeb}   = $hw;
-    $this->{history} = $ht;
+    $this->{history} = "$hw.$ht";
 
     # Disable unwanted plugins
     my $enabledPlugins  = '';
@@ -423,18 +436,26 @@ Used.
 BLAH
     }
 
-    my ( $meta, $text ) =
-      Foswiki::Func::readTopic( $this->{historyWeb}, $this->{history} );
-    $text ||= '';
-    $text =~ s/(^|\n)---\+ Last Published\n.*$//s;
+    my ( $meta, $text ) = Foswiki::Func::readTopic( $hw, $ht );
+    my $history = Foswiki::Func::loadTemplate( 'publish_history', $this->{publishskin} );
+    # See if we have history template. Unfortunately for compatibility
+    # reasons, Func::readTemplate doesn't distinguish between no template
+    # and an empty template :-(
+    if ($history) {
+	$history = Foswiki::Func::expandVariablesOnTopicCreation( $history );
+	$history =~ s/%HISTORY%/$this->{historyText}/g;
+    } elsif (Foswiki::Func::topicExists($hw, $ht)) {
+	# No template, use the last publish run (legacy)
+	$text ||= '';
+	$text =~ s/(^|\n)---\+ Last Published\n.*$//s;
+        $history = "$text---+ Last Published\n<noautolink>\n$this->{historyText}\n</noautolink>";
+    } else {
+	# No last run, make something up
+	$history = "---+ Last Published\n<noautolink>\n$this->{historyText}\n</noautolink>";
+    }
     Foswiki::Func::saveTopic(
-        $this->{historyWeb}, $this->{history}, $meta,
-        "$text---+ Last Published\n<noautolink>\n$this->{historyText}\n</noautolink>",
-        { minor => 1, forcenewrevision => 1 }
-    );
-    my $url =
-      Foswiki::Func::getScriptUrl( $this->{historyWeb}, $this->{history},
-        'view' );
+	$hw, $ht, $meta, $history, { minor => 1, forcenewrevision => 1 } );
+    my $url = Foswiki::Func::getScriptUrl( $hw, $ht, 'view' );
     $this->logInfo( "History saved in", "<a href='$url'>$url</a>" );
 
     Foswiki::Plugins::PublishPlugin::_display($footer);

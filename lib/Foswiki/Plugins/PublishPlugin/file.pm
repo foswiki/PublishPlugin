@@ -48,7 +48,10 @@ sub param_schema {
 	    default => 'file',
 	    validator => \&Foswiki::Plugins::PublishPlugin::Publisher::validateFilename
 	},
-	googlefile  => {},
+	googlefile  => {
+	    default => '',
+	    validator => \&Foswiki::Plugins::PublishPlugin::Publisher::validateFilenameList
+        },
 	defaultpage => { default => 'WebHome' },
 	%{$class->SUPER::param_schema}
     };
@@ -56,6 +59,7 @@ sub param_schema {
 
 sub addDirectory {
     my ( $this, $name ) = @_;
+
     my $oldmask = umask( oct(777) - $Foswiki::cfg{RCS}{dirPermission} );
     eval { File::Path::mkpath("$this->{path}$this->{params}->{outfile}/$name") };
     $this->{logger}->logError($@) if $@;

@@ -15,3 +15,4 @@ lib/Foswiki/Plugins/PublishPlugin/zip.pm 0444
 pub/System/PublishPlugin/publish.gif 0644
 pub/System/PublishPlugin/wikiringlogo20x20.png 0444
 templates/view.basic_publish.tmpl 0444
+templates/publish_history.basic_publish.tmpl 0444
