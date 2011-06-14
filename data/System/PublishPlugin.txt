@@ -675,7 +675,7 @@ This add-on started life as the !GenHTMLAddon, written by Foswiki:Main/CrawfordC
 |  Version: | %$VERSION% |
 |  Release: | %$RELEASE% |
 |  Change History: | |
-|  2.3.0 (13 Jun 2011) | Foswiki:Tasks/Item10870: support skinning of the history topic. Foswiki:Tasks/Item10870: support definition of session preferences from the publish form. Foswiki:Tasks/Item10843: bugfix to publishers control centre |
+|  2.3.1 (14 Jun 2011) | Foswiki:Tasks/Item10870: support skinning of the history topic. Foswiki:Tasks/Item10870: support definition of session preferences from the publish form. Foswiki:Tasks/Item10843: bugfix to publishers control centre |
 |  2.2.1 (25 May 2011) | Foswiki:Tasks/Item10578: allow list of publishskins; Foswiki:Tasks/Item10580: allow empty outfile param; Foswiki:Tasks/Item10585: support all valid topic names in topiclist; Foswiki:Tasks/Item10578: made template purging configurable Foswiki:Tasks/Item10594: merged patch; Foswiki:Tasks/Item10581: correct paths to resources in HTML output. (Diab Jerius and Crawford Currie) |
 |  2.2.0 (28 Mar 2011) | Foswiki:Tasks/Item8225: fix handling of plugin contexts Item2635: make sure index.html is generated Foswiki:Tasks/Item10529: test integration with BookmakerPlugin via new topiclist parameter |
 |  2.1.7 (01 Nov 2010) | Foswikitask:Item8658: fix rest output when publishing to file, pdf and ftp |

@@ -4,14 +4,16 @@
 #
 package Foswiki::Plugins::PublishPlugin;
 
+use strict;
+use warnings;
+
 use Foswiki ();
 use Foswiki::Func ();
 use Error qw( :try );
-
-use strict;
+use Assert;
 
 our $VERSION = '$Rev$';
-our $RELEASE = '2.3.0';
+our $RELEASE = '2.3.1';
 our $SHORTDESCRIPTION =
 'Generate static output (HTML, PDF) optionally upload (FTP) the output to a publishing site.';
 
