@@ -485,7 +485,7 @@ sub _getPageTemplate {
     my $tmpl  = Foswiki::Func::readTemplate('view');
 
     $tmpl =~ s/%META{.*?}%//g;
-    for my $tag qw( REVTITLE REVARG REVISIONS MAXREV CURRREV ) {
+    for my $tag (qw( REVTITLE REVARG REVISIONS MAXREV CURRREV )) {
         $tmpl =~ s/%$tag%//g;
     }
     my ( $header, $footer ) = split( /%TEXT%/, $tmpl );
@@ -679,8 +679,8 @@ sub publishTopic {
         # In 1.0.6 and earlier, have to handle some session tags ourselves
         # because pushTopicContext doesn't do it. **
         if (defined $Foswiki::Plugins::SESSION->{SESSION_TAGS}) {
-            foreach my $macro qw(BASEWEB BASETOPIC
-                                 INCLUDINGWEB INCLUDINGTOPIC) {
+            foreach my $macro (qw(BASEWEB BASETOPIC
+                                 INCLUDINGWEB INCLUDINGTOPIC)) {
                 $old{$macro} = Foswiki::Func::getPreferencesValue($macro);
             }
         }
@@ -853,8 +853,8 @@ sub publishTopic {
         if (defined $Foswiki::Plugins::SESSION->{SESSION_TAGS}) {
             # In 1.0.6 and earlier, have to handle some session tags ourselves
             # because pushTopicContext doesn't do it. **
-            foreach my $macro qw(BASEWEB BASETOPIC
-                                 INCLUDINGWEB INCLUDINGTOPIC) {
+            foreach my $macro (qw(BASEWEB BASETOPIC
+                                 INCLUDINGWEB INCLUDINGTOPIC)) {
                 $Foswiki::Plugins::SESSION->{SESSION_TAGS}{$macro} =
                   $old{$macro};
             }
