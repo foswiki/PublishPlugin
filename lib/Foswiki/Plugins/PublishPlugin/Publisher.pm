@@ -844,7 +844,7 @@ sub publishTopic {
     my $pub = Foswiki::Func::getPubUrlPath();
     $tmpl =~
       s!(['"\(])($Foswiki::cfg{DefaultUrlHost}|https?://$hs)?$pub/(.*?)(\1|\))!
-      $1.$this->_rsrcpath( "/$w" ,$this->_copyResource($3, $copied) ).$4!ge;
+      $1.$this->_rsrcpath( $w ,$this->_copyResource($3, $copied) ).$4!ge;
 
     my $ilt;
 
@@ -869,7 +869,7 @@ sub publishTopic {
 
     # Handle image tags using absolute URLs not otherwise satisfied
     $tmpl =~ s!(<img\s+.*?\bsrc=)(["'])(.*?)\2(.*?>)!
-      $1.$2.$this->_rsrcpath( "/$w",$this->_handleURL($3,\($this->{nextExternalResourceNumber})) ).$2.$4!ge;
+      $1.$2.$this->_rsrcpath( $w, $this->_handleURL($3,\($this->{nextExternalResourceNumber})) ).$2.$4!ge;
 
     $tmpl =~ s/<nop>//g;
 
