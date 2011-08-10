@@ -291,11 +291,10 @@ sub _loadConfigTopic {
     return \%data;
 }
 
-sub publishWeb {
-    my ( $this, $web ) = @_;
+sub publish {
+    my ( $this, @webs ) = @_;
 
     $this->{publisher} = Foswiki::Func::getWikiName();
-    $this->{web}       = $web;
 
     #don't add extra markup for topics we're not linking too
     # NEWTOPICLINKSYMBOL LINKTOOLTIPINFO
@@ -304,6 +303,26 @@ sub publishWeb {
     }
     else {
         $Foswiki::Plugins::SESSION->renderer()->{NEWLINKSYMBOL} = '';
+    }
+
+    # Disable unwanted plugins
+    my $enabledPlugins  = '';
+    my $disabledPlugins = '';
+    my @pluginsToEnable;
+
+    if ( $this->{enableplugins} ) {
+        @pluginsToEnable = split( /[, ]+/, $this->{enableplugins} );
+    }
+
+    foreach my $plugin ( keys( %{ $Foswiki::cfg{Plugins} } ) ) {
+        next unless ref( $Foswiki::cfg{Plugins}{$plugin} ) eq 'HASH';
+        my $enable = $Foswiki::cfg{Plugins}{$plugin}{Enabled};
+        if ( scalar(@pluginsToEnable) > 0 ) {
+            $enable = grep( /\b$plugin\b/, @pluginsToEnable );
+            $Foswiki::cfg{Plugins}{$plugin}{Enabled} = $enable;
+        }
+        $enabledPlugins .= ', ' . $plugin if ($enable);
+        $disabledPlugins .= ', ' . $plugin unless ($enable);
     }
 
     # Generate the progress information screen (based on the view template)
@@ -319,49 +338,14 @@ sub publishWeb {
         ( $header, $footer ) = $this->_getPageTemplate();
     }
 
-    my ( $hw, $ht ) =
-      Foswiki::Func::normalizeWebTopicName( $this->{web}, $this->{history} );
-    unless (
-        Foswiki::Func::checkAccessPermission(
-            'CHANGE', Foswiki::Func::getWikiName(),
-            undef, $ht, $hw
-        )
-      )
-    {
-        $this->logError( <<TEXT, $footer );
-Can't publish because $this->{publisher} can't CHANGE
-$hw.$ht.
-This topic must be editable by the user doing the publishing.
-TEXT
-        return;
-    }
-    $this->{history} = "$hw.$ht";
-
-    # Disable unwanted plugins
-    my $enabledPlugins  = '';
-    my $disabledPlugins = '';
-    my @pluginsToEnable;
-    if ( $this->{enableplugins} ) {
-        @pluginsToEnable = split( /[, ]+/, $this->{enableplugins} );
-    }
-    foreach my $plugin ( keys( %{ $Foswiki::cfg{Plugins} } ) ) {
-        next unless ref( $Foswiki::cfg{Plugins}{$plugin} ) eq 'HASH';
-        my $enable = $Foswiki::cfg{Plugins}{$plugin}{Enabled};
-        if ( scalar(@pluginsToEnable) > 0 ) {
-            $enable = grep( /\b$plugin\b/, @pluginsToEnable );
-            $Foswiki::cfg{Plugins}{$plugin}{Enabled} = $enable;
-        }
-        $enabledPlugins .= ', ' . $plugin if ($enable);
-        $disabledPlugins .= ', ' . $plugin unless ($enable);
-    }
-
+    $this->logInfo( '', "<h1>Publishing Details</h1>" );
     $this->logInfo( "Publisher", $this->{publisher} );
     $this->logInfo( "Date",      Foswiki::Func::formatTime( time() ) );
     $this->logInfo( "Dir",
         "$Foswiki::cfg{PublishPlugin}{Dir}$this->{relativedir}" );
     $this->logInfo( "URL",
         "$Foswiki::cfg{PublishPlugin}{URL}$this->{relativeurl}" );
-    $this->logInfo( "Web",            $this->{web} );
+    $this->logInfo( "Web(s)",            join( ', ', @webs ) );
     $this->logInfo( "Versions topic", $this->{versions} )
       if $this->{versions};
     $this->logInfo( "Content Generator", $this->{format} );
@@ -389,6 +373,73 @@ TEXT
     $this->logInfo( "Enabled Plugins",   $enabledPlugins );
     $this->logInfo( "Disabled Plugins",  $disabledPlugins );
 
+    my $firstWeb = $webs[0];
+
+    my ( $hw, $ht ) =
+      Foswiki::Func::normalizeWebTopicName( $firstWeb, $this->{history} );
+    unless (
+        Foswiki::Func::checkAccessPermission(
+            'CHANGE', Foswiki::Func::getWikiName(),
+            undef, $ht, $hw
+        )
+      )
+    {
+        $this->logError( <<TEXT, $footer );
+Can't publish because $this->{publisher} can't CHANGE
+$hw.$ht.
+This topic must be editable by the user doing the publishing.
+TEXT
+        return;
+    }
+    $this->{history} = "$hw.$ht";
+
+    foreach my $web (@webs) {
+	$this->_publishWeb($web);
+    }
+
+    my ( $meta, $text ) = Foswiki::Func::readTopic( $hw, $ht );
+    my $history =
+      Foswiki::Func::loadTemplate( 'publish_history', $this->{publishskin} );
+
+    # See if we have history template. Unfortunately for compatibility
+    # reasons, Func::readTemplate doesn't distinguish between no template
+    # and an empty template :-(
+    if ($history) {
+
+        # Expand macros *before* we include the history text so we pick up
+        # session preferences.
+        Foswiki::Func::setPreferencesValue( 'PUBLISHING_HISTORY',
+            $this->{historyText} );
+        $history = Foswiki::Func::expandCommonVariables($history);
+    }
+    elsif ( Foswiki::Func::topicExists( $hw, $ht ) ) {
+
+        # No template, use the last publish run (legacy)
+        $text ||= '';
+        $text =~ s/(^|\n)---\+ Last Published\n.*$//s;
+        $history =
+"$text---+ Last Published\n<noautolink>\n$this->{historyText}\n</noautolink>";
+    }
+    else {
+
+        # No last run, make something up
+        $history =
+"---+ Last Published\n<noautolink>\n$this->{historyText}\n</noautolink>";
+    }
+    Foswiki::Func::saveTopic( $hw, $ht, $meta, $history,
+        { minor => 1, forcenewrevision => 1 } );
+    my $url = Foswiki::Func::getScriptUrl( $hw, $ht, 'view' );
+    $this->logInfo( "History saved in", "<a href='$url'>$url</a>" );
+
+    Foswiki::Plugins::PublishPlugin::_display($footer);
+}
+
+sub _publishWeb {
+    my ($this, $web) = @_;
+
+    $this->{web} = $web;
+
+    $this->logInfo( '', "<h1>Publishing web '$web'</h1>" );
     if ( $this->{versions} ) {
         $this->{topicVersions} = {};
         my ( $vweb, $vtopic ) =
@@ -460,42 +511,6 @@ needed. Consider changing the TEMPLATES setting so it has all Templates
 Used.
 BLAH
     }
-
-    my ( $meta, $text ) = Foswiki::Func::readTopic( $hw, $ht );
-    my $history =
-      Foswiki::Func::loadTemplate( 'publish_history', $this->{publishskin} );
-
-    # See if we have history template. Unfortunately for compatibility
-    # reasons, Func::readTemplate doesn't distinguish between no template
-    # and an empty template :-(
-    if ($history) {
-
-        # Expand macros *before* we include the history text so we pick up
-        # session preferences.
-        Foswiki::Func::setPreferencesValue( 'PUBLISHING_HISTORY',
-            $this->{historyText} );
-        $history = Foswiki::Func::expandCommonVariables($history);
-    }
-    elsif ( Foswiki::Func::topicExists( $hw, $ht ) ) {
-
-        # No template, use the last publish run (legacy)
-        $text ||= '';
-        $text =~ s/(^|\n)---\+ Last Published\n.*$//s;
-        $history =
-"$text---+ Last Published\n<noautolink>\n$this->{historyText}\n</noautolink>";
-    }
-    else {
-
-        # No last run, make something up
-        $history =
-"---+ Last Published\n<noautolink>\n$this->{historyText}\n</noautolink>";
-    }
-    Foswiki::Func::saveTopic( $hw, $ht, $meta, $history,
-        { minor => 1, forcenewrevision => 1 } );
-    my $url = Foswiki::Func::getScriptUrl( $hw, $ht, 'view' );
-    $this->logInfo( "History saved in", "<a href='$url'>$url</a>" );
-
-    Foswiki::Plugins::PublishPlugin::_display($footer);
 }
 
 # get a template for presenting output / interacting (*not* used

@@ -65,12 +65,12 @@ sub _publishRESTHandler {
         $publisher->control($query);
     }
     else {
-        my $web = $query->param('web')
+        my $webs = $query->param('web')
           || $Foswiki::Plugins::SESSION->{webName};
         $query->delete('web');
-        $web =~ m#([\w/.]*)#;    # clean up and untaint
+        $webs =~ m#([\w/.,\s]*)#;    # clean up and untaint
 
-        $publisher->publishWeb($1);
+        $publisher->publish(split(/[,\s]+/, $1));
     }
     $publisher->finish();
 }
@@ -171,7 +171,7 @@ __END__
 # Copyright (C) 2001 Motorola
 # Copyright (C) 2001-2007 Sven Dowideit, svenud@ozemail.com.au
 # Copyright (C) 2002, Eric Scouten
-# Copyright (C) 2005-2008 Crawford Currie, http://c-dot.co.uk
+# Copyright (C) 2005-2011 Crawford Currie, http://c-dot.co.uk
 # Copyright (C) 2006 Martin Cleaver, http://www.cleaver.org
 #
 # This program is free software; you can redistribute it and/or
