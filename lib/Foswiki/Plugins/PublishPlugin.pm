@@ -131,7 +131,7 @@ HERE
         }
     }
     if ( opendir( D, $Foswiki::cfg{PublishPlugin}{Dir} ) ) {
-        my @files = grep( !/^\./, readdir(D) );
+        my @files = sort grep( !/^\./, readdir(D) );
         if ( scalar(@files) ) {
             $output .= CGI::start_table();
             foreach $file (@files) {
