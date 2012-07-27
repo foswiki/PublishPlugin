@@ -395,6 +395,9 @@ TEXT
     }
     $this->{history} = "$hw.$ht";
 
+    # Force static context for all published topics
+    Foswiki::Func::getContext()->{static} = 1;
+
     foreach my $web (@webs) {
         $this->_publishWeb($web);
     }
