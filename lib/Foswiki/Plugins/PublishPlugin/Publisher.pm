@@ -1052,20 +1052,28 @@ sub _copyResource {
                 my $pub = Foswiki::Func::getPubUrlPath();
                 foreach my $resource (@moreResources) {
 
-                    # recurse
-                    if ( $resource !~ m!^/! ) {
+                    # if the resource is at an absolute URL (not path)
+                    # don't try and make a local copy of it.  that
+                    # would require rewriting the CSS file which is not
+                    # currently supported.
 
-                        # if the url is not absolute, assume it's
-                        # relative to the current path
-                        $resource = $path . '/' . $resource;
-                    }
-                    else {
-                        if ( $resource =~ m!$pub/(.*)! ) {
-                            my $old = $resource;
-                            $resource = $1;
+                    unless ( $resource =~ /^http/ ) {
+
+                        # recurse
+                        if ( $resource !~ m!^/! ) {
+
+                            # if the url is not absolute, assume it's
+                            # relative to the current path
+                            $resource = $path . '/' . $resource;
                         }
+                        else {
+                            if ( $resource =~ m!$pub/(.*)! ) {
+                                my $old = $resource;
+                                $resource = $1;
+                            }
+                        }
+                        $this->_copyResource( $resource, $copied );
                     }
-                    $this->_copyResource( $resource, $copied );
                 }
             }
         }
