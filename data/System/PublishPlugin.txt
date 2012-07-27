@@ -51,7 +51,7 @@ Publishing is an access-controlled process; before you can publish, you have to 
 You can also create a [[#PublishTopic][permanent topic in a web]] to help with a repeated publishing process.
 
 %H% Most publishing tasks will only require setting the immediately visible options.
-Other more advanced options can be accessed by opening the collabsible sections.
+Other more advanced options can be accessed by opening the collapsible sections.
 
 %ADDTOHEAD{text="<style type=\"text/css\" media=\"all\">
 .foswikiPageForm table th, .foswikiPageForm table td {
@@ -139,18 +139,18 @@ table.publishForm .paramCol {
     <td colspan="4">
       %TWISTY{mode="div" showlink="Advanced topic selection..."}%
       <table class="foswikiTable publishForm">
-	<td class="nameCol"> 
-	  Include filter
-	</td>
-	<td class="inputCol"> 
-	  <input type="text" name="inclusions" class="foswikiInputField" value="%URLPARAM{"inclusions" default="*" encode="entity"}%" size="30" title="Use * to publish all topics in the topic list">
-	</td>
-	<td class="infoCol">
-	  Comma-separated list of [[#WildcardPattern][wildcard patterns]] that match the names of topics to include. This acts as a filter on the topic list. Use * to publish all topics in the list.
-	</td>
-	<td class="paramCol">
-	  =inclusions=
-	</td>
+      	<tr> 
+      	  <td class="nameCol"> 
+	    Include filter
+	  </td>
+	  <td class="inputCol"> 
+	    <input type="text" name="inclusions" class="foswikiInputField" value="%URLPARAM{"inclusions" default="*" encode="entity"}%" size="30" title="Use * to publish all topics in the topic list">
+	  </td>
+	  <td class="infoCol">
+	    Comma-separated list of [[#WildcardPattern][wildcard patterns]] that match the names of topics to include. This acts as a filter on the topic list. Use =*= to publish all topics in the list.
+	  </td>
+	  <td class="paramCol"><code>inclusions</code></td>
+        </tr>
 	<tr class="expert">
 	  <td class="nameCol"> 
 	    Exclude filter
@@ -304,6 +304,7 @@ ISBN=1-56592-149-6
     <td class="inputCol">
       <select name="format" id="selectedFormat" class="foswikiSelect">
 	<option>file</option>
+	<option>flatfile</option>
 	<option>zip</option>
 	<option>tgz</option>
 	<option>pdf</option>
@@ -311,7 +312,7 @@ ISBN=1-56592-149-6
       </select>
     </td>
     <td class="infoCol">
-      Generates HTML output (=file=), HTML output compressed as =zip= or =tgz=, HTML uploaded to a =ftp= server, or =pdf=.
+      Generates HTML output (=file=), HTML output compressed as =zip= or =tgz=, HTML uploaded to a =ftp= server, or =pdf=. =flatfile= will generate a single =.html= file with all topics concatenated into it.
     </td>
     <td class="paramCol">
       =format=

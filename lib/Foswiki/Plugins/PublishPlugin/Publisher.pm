@@ -256,7 +256,7 @@ sub _loadConfigTopic {
       Foswiki::Func::normalizeWebTopicName( $this->{web},
         $this->{configtopic} );
     unless ( Foswiki::Func::topicExists( $cw, $ct ) ) {
-        die "Specified configuration topic $cw.$ct does not exist!\n";
+        die "Specified configuration topic $cw.$ct does not exist!";
     }
 
     # Untaint verified web and topic names
@@ -356,7 +356,9 @@ sub publish {
     # Push preference values. Because we use session preferences (preferences
     # that only live as long as the request) these values will not persist.
     if ( $this->{preferences} ) {
-        foreach my $setting ( split( /\r?\n/, $this->{preferences} ) ) {
+        my $sep =
+          Foswiki::Func::getContext()->{command_line} ? qr/;/ : qr/\r?\n/;
+        foreach my $setting ( split( $sep, $this->{preferences} ) ) {
             if ( $setting =~ /^(\w+)\s*=(.*)$/ ) {
                 my ( $k, $v ) = ( $1, $2 );
                 Foswiki::Func::setPreferencesValue( $k, $v );
@@ -863,7 +865,7 @@ sub publishTopic {
 
     my $ilt;
 
-    # Modify local links relative to server base
+    # Modify local links to topics relative to server base
     $ilt =
       $Foswiki::Plugins::SESSION->getScriptUrl( 0, 'view', 'NOISE', 'NOISE' );
     $ilt  =~ s!/NOISE/NOISE.*$!!;
@@ -1069,6 +1071,8 @@ sub _copyResource {
     return "MISSING RESOURCE $rsrcName";
 }
 
+# Deal with a topic URL. The path passed is *after* removal of the prefix
+# added by getScriptURL
 sub _topicURL {
     my ( $this, $path ) = @_;
     my $extra = '';
@@ -1079,6 +1083,12 @@ sub _topicURL {
         # no point in passing on script params; we are publishing
         # to static HTML.
         $extra =~ s/\?.*?(#|$)/$1/;
+    }
+
+    # See if the generator can deal with this topic
+    if ( $this->{archive}->can('mapTopicURL') ) {
+        my $gen = $this->{archive}->mapTopicURL($path);
+        return $gen if $gen;
     }
 
     $path ||= $Foswiki::cfg{HomeTopicName};

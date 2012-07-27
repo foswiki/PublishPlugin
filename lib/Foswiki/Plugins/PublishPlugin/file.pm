@@ -38,6 +38,8 @@ sub new {
     umask($oldmask);
     die $@ if $@;
 
+    push( @{ $this->{files} }, 'index.html' );
+
     return $this;
 }
 
@@ -81,7 +83,8 @@ sub addString {
         binmode($fh);
         print $fh $string;
         close($fh);
-        push( @{ $this->{files} }, $file );
+        push( @{ $this->{files} }, $file )
+          unless ( grep { /^$file$/ } @{ $this->{files} } );
     }
     else {
         $this->{logger}->logError("Cannot write $file: $!");
@@ -126,6 +129,7 @@ sub addFile {
     my @stat = stat($from);
     $this->{logger}->logError("Unable to stat $from") unless @stat;
     utime( @stat[ 8, 9 ], $dest );
+    die if $to =~ /index.html/;
     push( @{ $this->{files} }, $to );
 }
 

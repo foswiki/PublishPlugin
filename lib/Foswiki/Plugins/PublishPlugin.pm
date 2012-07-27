@@ -83,7 +83,13 @@ sub _display {
         $Foswiki::Plugins::SESSION->{response}->print($msg);
     }
     else {
-        print $msg;
+        if ( $msg =~ /foswikiAlert/ ) {
+            $msg = "*** $msg";
+        }
+
+        # Strip HTML tags from command-line output
+        $msg =~ s/<[a-z]+[^>]*>/ /g;
+        print "$msg\n";
     }
 }
 

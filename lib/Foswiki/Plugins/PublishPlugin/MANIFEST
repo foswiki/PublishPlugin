@@ -8,11 +8,12 @@ lib/Foswiki/Plugins/PublishPlugin/Publisher.pm 0444
 lib/Foswiki/Plugins/PublishPlugin/PageAssembler.pm 0444
 lib/Foswiki/Plugins/PublishPlugin/BackEnd.pm 0444
 lib/Foswiki/Plugins/PublishPlugin/file.pm 0444
+lib/Foswiki/Plugins/PublishPlugin/flatfile.pm 0444
 lib/Foswiki/Plugins/PublishPlugin/ftp.pm 0444
 lib/Foswiki/Plugins/PublishPlugin/pdf.pm 0444
 lib/Foswiki/Plugins/PublishPlugin/tgz.pm 0444
 lib/Foswiki/Plugins/PublishPlugin/zip.pm 0444
 pub/System/PublishPlugin/publish.gif 0644
-pub/System/PublishPlugin/wikiringlogo20x20.png 0444
+pub/System/PublishPlugin/wikiringlogo20x20.png 0644
 templates/view.basic_publish.tmpl 0444
 templates/publish_history.basic_publish.tmpl 0444
