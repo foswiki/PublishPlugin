@@ -20,6 +20,7 @@ BEGIN {
 }
 
 my %parameters = (
+    copyexternal  => { default   => 1 },
     debug         => { default   => 0 },
     enableplugins => { validator => \&_validateList },
     exclusions    => { default   => '', validator => \&_wildcard2RE },
@@ -33,7 +34,7 @@ my %parameters = (
     publishskin => { validator => \&_validateList },
     relativedir => { default   => '', validator => \&_validateRelPath },
     rsrcdir => {
-        default   => 'rsrc',
+        default   => '/rsrc',
         validator => sub {
             my ( $v, $k ) = @_;
             $v = _validateRelPath( $v, $k );
@@ -1111,6 +1112,8 @@ sub _topicURL {
 sub _handleURL {
     my ( $this, $src, $extras ) = @_;
 
+    return $src unless $this->{copyexternal};
+
     my $data;
     if ( defined(&Foswiki::Func::getExternalResource) ) {
         my $response = Foswiki::Func::getExternalResource($src);
@@ -1164,8 +1167,10 @@ sub _rsrcpath {
 
     my ( $this, $odir, $rsrcloc ) = @_;
 
-    # if path is already relative, return it
-    return $rsrcloc if $rsrcloc =~ m{^\.+/};
+    $odir = "/$odir" unless $odir =~ /^\//;
+
+    # if path is already relative or URLish, return it
+    return $rsrcloc if $rsrcloc =~ m{^(?:\.+/|[a-z]+:)};
 
     # relative path to rsrc dir from output dir
     my $nloc = File::Spec->abs2rel( $rsrcloc, $odir );

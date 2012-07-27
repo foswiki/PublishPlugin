@@ -282,6 +282,24 @@ ISBN=1-56592-149-6
 	    =templates=
 	  </td>
 	</tr>
+        <tr class="expert">
+          <td class="nameCol">Copy External Resources </td>
+          <td class="inputCol">
+            <input type="checkbox" name="copyexternal" checked="checked" class="foswikiCheckbox" />
+          </td>
+          <td class="infoCol">
+            Copy externally referenced resources (e.g. images on other servers).
+            This option enables the copying of resources hosted on external
+	    servers into the published content. If it is disabled, the plugin
+	    will maintain an internet link to the external content. Enable this
+            option if you want the pubished content to be totally self-contained
+            (for example, for offline reading) or disable it for faster
+            publishing process and smaller output.
+          </td>
+          <td class="paramCol">
+            =copyexternal=
+          </td>
+ 	</tr>
       </table>
       %ENDTWISTY%
     </td>
