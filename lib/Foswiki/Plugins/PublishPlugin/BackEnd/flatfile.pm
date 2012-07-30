@@ -14,12 +14,15 @@
 #
 # File writer module for PublishPlugin
 #
-package Foswiki::Plugins::PublishPlugin::flatfile;
+package Foswiki::Plugins::PublishPlugin::BackEnd::flatfile;
 
 use strict;
 
-use Foswiki::Plugins::PublishPlugin::file;
-our @ISA = ('Foswiki::Plugins::PublishPlugin::file');
+use Foswiki::Plugins::PublishPlugin::BackEnd::file;
+our @ISA = ('Foswiki::Plugins::PublishPlugin::BackEnd::file');
+
+use constant DESCRIPTION =>
+'Single HTML file containing all topics. Attachments will be saved to a resource directory on the server.';
 
 sub new {
     my $class = shift;
@@ -52,9 +55,8 @@ sub addString {
     my $fh = $this->{flatfile};
 
     # Add an anchor to act as a destination for jumps to this topic
-    print $fh "<!-- $file -->";
     my $a = _encodeAnchor($file);
-    print $fh "<a name='$a'></a><h1>$file</h1>";
+    print $fh "<a name='$a'><!-- $file --></a>";
     print $fh $string;
 }
 
@@ -85,8 +87,12 @@ sub _encodeAnchor {
 # Convert a topic URL to an anchor references
 sub mapTopicURL {
     my ( $this, $path ) = @_;
-
-    return '#' . _encodeAnchor($path);
+    print STDERR "CUNT $path\n";
+    if ( $path =~ /(#.*)$/ ) {
+        return $1;
+    }
+    $path = '#' . _encodeAnchor($path);
+    return $path;
 }
 
 sub close {

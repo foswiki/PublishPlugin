@@ -15,11 +15,14 @@
 # PDF writer module for PublishPlugin
 #
 
-package Foswiki::Plugins::PublishPlugin::pdf;
+package Foswiki::Plugins::PublishPlugin::BackEnd::pdf;
 
 use strict;
-use Foswiki::Plugins::PublishPlugin::file;
-our @ISA = ('Foswiki::Plugins::PublishPlugin::file');
+use Foswiki::Plugins::PublishPlugin::BackEnd::file;
+our @ISA = ('Foswiki::Plugins::PublishPlugin::BackEnd::file');
+
+use constant DESCRIPTION =>
+'PDF file with all content in it. Each topic will start on a new page in the PDF.';
 
 use File::Path;
 

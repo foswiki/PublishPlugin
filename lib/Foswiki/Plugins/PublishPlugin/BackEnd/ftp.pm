@@ -19,14 +19,17 @@
 # allow method POST for 'ftp:' URLs"
 # TODO: clean up ftp site, removing/archiving/backing up old version
 
-package Foswiki::Plugins::PublishPlugin::ftp;
+package Foswiki::Plugins::PublishPlugin::BackEnd::ftp;
 
 use strict;
 
 # Inherit from file backend; we use the local copy as the cache for
 # uploading from
-use Foswiki::Plugins::PublishPlugin::file;
-our @ISA = ('Foswiki::Plugins::PublishPlugin::file');
+use Foswiki::Plugins::PublishPlugin::BackEnd::file;
+our @ISA = ('Foswiki::Plugins::PublishPlugin::BackEnd::file');
+
+use constant DESCRIPTION =>
+'Upload generated HTML to an FTP site. Options controlling the upload can be set below.';
 
 use File::Temp qw(:seekable);
 use File::Spec;

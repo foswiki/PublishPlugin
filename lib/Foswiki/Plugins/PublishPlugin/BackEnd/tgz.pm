@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2005 Crawford Currie, http://c-dot.co.uk
+# Copyright (C) 2005-2009 Crawford Currie, http://c-dot.co.uk
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -14,25 +14,28 @@
 #
 # Archive::Zip writer module for PublishPlugin
 #
-package Foswiki::Plugins::PublishPlugin::zip;
+package Foswiki::Plugins::PublishPlugin::BackEnd::tgz;
 
 use strict;
 
 use Foswiki::Plugins::PublishPlugin::BackEnd;
 our @ISA = ('Foswiki::Plugins::PublishPlugin::BackEnd');
 
+use constant DESCRIPTION =>
+  'HTML compressed into a single tgz archive for shipping.';
+
 use Foswiki::Func;
 use File::Path;
+use Assert;
 
 sub new {
     my $class = shift;
     my ($params) = @_;
-    $params->{outfile} ||= "zip";
+    $params->{outfile} ||= "tgz";
     my $this = $class->SUPER::new(@_);
 
-    eval 'use Archive::Zip qw( :ERROR_CODES :CONSTANTS )';
-    die $@ if $@;
-    $this->{zip} = Archive::Zip->new();
+    require Archive::Tar;
+    $this->{tar} = Archive::Tar->new();
 
     return $this;
 }
@@ -41,7 +44,7 @@ sub param_schema {
     my $class = shift;
     return {
         outfile => {
-            default => 'zip',
+            default => 'tgz',
             validator =>
               \&Foswiki::Plugins::PublishPlugin::Publisher::validateFilename
         },
@@ -49,22 +52,26 @@ sub param_schema {
     };
 }
 
-sub addDirectory {
-    my ( $this, $dir ) = @_;
-    $this->{logger}->logError("Error adding $dir")
-      unless $this->{zip}->addDirectory($dir);
-}
-
 sub addString {
     my ( $this, $string, $file ) = @_;
-    $this->{logger}->logError("Error adding $string")
-      unless $this->{zip}->addString( $string, $file );
+    unless ( $this->{tar}->add_data( $file, $string ) ) {
+        $this->{logger}->logError( $this->{tar}->error() );
+    }
 }
 
 sub addFile {
     my ( $this, $from, $to ) = @_;
-    $this->{logger}->logError("Error adding $from")
-      unless $this->{zip}->addFile( $from, $to );
+    my $fh;
+    if ( open( $fh, '<', $from ) ) {
+        local $/;
+        binmode($fh);
+        my $contents = <$fh>;
+        $this->addString( $contents, $to );
+        close($fh);
+    }
+    else {
+        $this->{logger}->logError("Failed to open $from: $!");
+    }
 }
 
 sub close {
@@ -72,9 +79,10 @@ sub close {
     my $dir  = $this->{path};
     eval { File::Path::mkpath($dir) };
     $this->{logger}->logError($@) if $@;
-    my $landed = "$this->{params}->{outfile}.zip";
-    $this->{logger}->logError("Error writing $landed")
-      if $this->{zip}->writeToFileNamed("$this->{path}$landed");
+    my $landed = "$this->{params}->{outfile}.tgz";
+    unless ( $this->{tar}->write( "$this->{path}$landed", 1 ) ) {
+        $this->{logger}->logError( $this->{tar}->error() );
+    }
     return $landed;
 }
 

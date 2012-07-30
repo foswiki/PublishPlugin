@@ -14,7 +14,7 @@
 #
 # File writer module for PublishPlugin
 #
-package Foswiki::Plugins::PublishPlugin::file;
+package Foswiki::Plugins::PublishPlugin::BackEnd::file;
 
 use strict;
 
@@ -23,6 +23,9 @@ our @ISA = ('Foswiki::Plugins::PublishPlugin::BackEnd');
 
 use File::Copy ();
 use File::Path ();
+
+use constant DESCRIPTION =>
+"A directory tree on the server containing a single HTML file for each topic and copies of all published attachments.";
 
 sub new {
     my $class = shift;

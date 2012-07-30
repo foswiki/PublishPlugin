@@ -189,7 +189,7 @@ sub new {
     # Try and build the generator first, so we can pull in param defs
     $data->{format} ||= 'file';
     die "Bad format" unless $data->{format} =~ /^(\w+)$/;
-    $this->{generator} = 'Foswiki::Plugins::PublishPlugin::' . $1;
+    $this->{generator} = 'Foswiki::Plugins::PublishPlugin::BackEnd::' . $1;
     eval 'use ' . $this->{generator};
 
     if ($@) {
@@ -398,6 +398,27 @@ TEXT
 
     # Force static context for all published topics
     Foswiki::Func::getContext()->{static} = 1;
+
+    # Start by making a master list of all published topics. We do this
+    # so we can detect whether a topic is in the publish set when
+    # remapping links. Note that we use /, not ., in the path. This is
+    # to make matching URL paths easier.
+    my %topics;
+    foreach my $web (@webs) {
+        if ( $this->{topiclist} ) {
+            foreach my $topic ( split( /[,\s]+/, $this->{topiclist} ) ) {
+                my ( $w, $t ) =
+                  Foswiki::Func::normalizeWebTopicName( $web, $topic );
+                $topics{"$w/$t"} = 1;
+            }
+        }
+        else {
+            foreach my $topic ( Foswiki::Func::getTopicList($web) ) {
+                $topics{"$web/$topic"} = 1;
+            }
+        }
+    }
+    $this->{topics} = \%topics;
 
     foreach my $web (@webs) {
         $this->_publishWeb($web);
@@ -840,8 +861,7 @@ sub publishTopic {
 
         # Note: Foswiki 1.1 supplies this same header text
         # when dispatching completePageHandler.
-        my $CRLF = "\x0D\x0A";
-        my $hdr  = "Content-type: text/html$CRLF$CRLF";
+        my $hdr = "Content-type: text/html\r\n";
         $Foswiki::Plugins::SESSION->{plugins}
           ->dispatch( 'completePageHandler', $tmpl, $hdr );
     }
@@ -872,14 +892,22 @@ sub publishTopic {
     # Modify local links to topics relative to server base
     $ilt =
       $Foswiki::Plugins::SESSION->getScriptUrl( 0, 'view', 'NOISE', 'NOISE' );
-    $ilt  =~ s!/NOISE/NOISE.*$!!;
-    $tmpl =~ s!href=(["'])$ilt/(.*?)\1!"href=$1".$this->_topicURL($2).$1!ge;
+    $ilt =~ s!/NOISE/NOISE.*$!!;
+    $tmpl =~
+      s!href=(["'])$ilt/(.*?)\1!"href=$1".$this->_topicURL($ilt, $2).$1!ge;
+
+    # Handle simple topic links (subwebs not handled)
+    $tmpl =~
+s!href=(["'])([$Foswiki::regex{mixedAlphaNum}_]+([#?].*?)?)\1!"href=$1".$this->_topicURL($ilt, "$this->{web}/$2").$1!ge;
 
     # Modify absolute topic links.
     $ilt =
       $Foswiki::Plugins::SESSION->getScriptUrl( 1, 'view', 'NOISE', 'NOISE' );
-    $ilt  =~ s!/NOISE/NOISE.*$!!;
-    $tmpl =~ s!href=(["'])$ilt/(.*?)\1!"href=$1".$this->_topicURL($2).$1!ge;
+    $ilt =~ s!/NOISE/NOISE.*$!!;
+    $tmpl =~
+      s!href=(["'])$ilt/(.*?)\1!"href=$1".$this->_topicURL($ilt, $2).$1!ge;
+
+    # Modify topic-relative links
 
     # Modify topic-relative TOC links to strip out parameters (but not anchor)
     $tmpl =~ s!href=(["'])\?.*?(\1|#)!href=$1$2!g;
@@ -1085,25 +1113,36 @@ sub _copyResource {
 
 # Deal with a topic URL. The path passed is *after* removal of the prefix
 # added by getScriptURL
+# $root - the root of the URL path, recognised as being a URL on the wiki
+# $path - the foswiki path to the topic from the URL
 sub _topicURL {
-    my ( $this, $path ) = @_;
-    my $extra = '';
+    my ( $this, $root, $path ) = @_;
+    my $anchor = '';
+    my $params = '';
 
-    if ( $path && $path =~ s/([#\?].*)$// ) {
-        $extra = $1;
+    # Null path -> server root
+    $path = $Foswiki::cfg{HomeTopicName} unless defined $path;
 
-        # no point in passing on script params; we are publishing
-        # to static HTML.
-        $extra =~ s/\?.*?(#|$)/$1/;
+    if ( $path =~ s/(\?.*?)?(#.*?)?$// ) {
+        $params = $1 if defined $1;
+        $anchor = $2 if defined $2;
     }
+
+    # Is this a path to a known topic? If not, reform the original URL
+    return "$root/$path$params$anchor" unless $this->{topics}->{$path};
+
+    # For here on we know we're dealing with a topic link, so we
+    # ignore params in the rewritten URL - they won't be any use
+    # when linking to static content.
 
     # See if the generator can deal with this topic
     if ( $this->{archive}->can('mapTopicURL') ) {
-        my $gen = $this->{archive}->mapTopicURL($path);
+        my $gen = $this->{archive}->mapTopicURL( $path . $anchor );
         return $gen if $gen;
     }
 
-    $path ||= $Foswiki::cfg{HomeTopicName};
+    # Default handling; assumes we are recreating the hierarchy in
+    # the output.
     $path .= $Foswiki::cfg{HomeTopicName} if $path =~ /\/$/;
 
     # Normalise
@@ -1112,9 +1151,10 @@ sub _topicURL {
 
     # make a path relative to the web
     $path = File::Spec->abs2rel( $path, $web );
+
     $path .= '.html';
 
-    return $path . $extra;
+    return $path . $anchor;
 }
 
 sub _handleURL {

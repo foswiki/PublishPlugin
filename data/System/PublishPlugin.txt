@@ -144,7 +144,7 @@ table.publishForm .paramCol {
 	    Include filter
 	  </td>
 	  <td class="inputCol"> 
-	    <input type="text" name="inclusions" class="foswikiInputField" value="%URLPARAM{"inclusions" default="*" encode="entity"}%" size="30" title="Use * to publish all topics in the topic list">
+	    <input type="text" name="inclusions" class="foswikiInputField" value="%URLPARAM{"inclusions" default="*" encode="entity"}%" size="30" title="Use * to publish all topics in the topic list" />
 	  </td>
 	  <td class="infoCol">
 	    Comma-separated list of [[#WildcardPattern][wildcard patterns]] that match the names of topics to include. This acts as a filter on the topic list. Use =*= to publish all topics in the list.
@@ -234,7 +234,7 @@ table.publishForm .paramCol {
 	    <textarea name="preferences" class="foswikiInputField" rows="5" cols="80"></textarea>
 	  </td>
 	  <td class="infoCol">
-	  Lets you define [[PreferenceSettings][preferences]] that apply only to this
+	  Lets you define Foswiki [[PreferenceSettings][preferences]] that will be available for use in topics during this
 	  publishing run. Define preferences one per line, using the syntax 
 	  =PREFERENCE=VALUE= - for example, <verbatim>
 TOOL_VERSION=3.14.15
@@ -321,16 +321,14 @@ ISBN=1-56592-149-6
     <td class="nameCol">Output format</td>
     <td class="inputCol">
       <select name="format" id="selectedFormat" class="foswikiSelect">
-	<option>file</option>
-	<option>flatfile</option>
-	<option>zip</option>
-	<option>tgz</option>
-	<option>pdf</option>
-	<option>ftp</option>
+        %PUBLISHING_GENERATORS{format="<option>$name</option>" separator=""}%
       </select>
     </td>
     <td class="infoCol">
-      Generates HTML output (=file=), HTML output compressed as =zip= or =tgz=, HTML uploaded to a =ftp= server, or =pdf=. =flatfile= will generate a single =.html= file with all topics concatenated into it.
+      The available formats are:
+      <dl>
+        %PUBLISHING_GENERATORS{format="<dt> =$name= </dt><dd>$help</dd>" separator=""}%
+      </dl>
     </td>
     <td class="paramCol">
       =format=
@@ -661,21 +659,17 @@ The history topic contains a list of all the parameters used, and the versions o
 ---++ Installation Instructions
 ---+++ Dependencies
 
-Note: If you want to generate PDF files, you will need an installation of =htmldoc=. This program is available from http://www.easysw.com/htmldoc/ for free, but you are *strongly* recommended to buy the commercial version. Your support for open-source projects helps make open-source software possible.
-
 %$INSTALL_INSTRUCTIONS%
 
-Run =configure= and complete the installation in the *PublishPlugin* section.
+*IMPORTANT* Run =configure= and complete the installation in the *PublishPlugin* section.
 
----++++ =PDF= output
-Install htmldoc from http://www.easysw.com/htmldoc/
+If you want to generate PDF files, you will need an installation of a PDF generator, for example =htmldoc= or =prince=. Find them using google.
 
 Note that =htmldoc= can also be used to generate !PostScript by using the =-t= option in the =Other output generator options= above. See the =htmldoc= man pages for details.
 
----++++ =.tgz= (tar) output
-Install Archive::Tar and everything it depends on
+If you want =.zip= output you will have to install =Archive::Zip= and everything it depends on.
 
----++++ =.zip= output
+If you want =.tgz= (tar) output, install Archive::Tar and everything it depends on.
 Install Archive::Zip and everything it depends on
 
 *WARNING!* Anything published is no longer under the
@@ -694,6 +688,7 @@ This add-on started life as the !GenHTMLAddon, written by Foswiki:Main/CrawfordC
 |  Version: | %$VERSION% |
 |  Release: | %$RELEASE% |
 |  Change History: | |
+|  2.4.0 (30 Jul 2012) | Foswiki:Tasks/Item12016 Add capability to construct flat HTML and PDF files. Bugfixes: Foswiki:Tasks/Item11988 Foswiki:Tasks/Item11339 Foswiki:Tasks/Item11345 Foswiki:Tasks/Item8260 Foswiki:Tasks/Item10597 Foswiki:Tasks/Item11346 |
 |  2.3.2 (10 Aug 2011) | Foswiki:Tasks/Item10944: Fix publishing of attachments |
 |  2.3.1 (14 Jun 2011) | Foswiki:Tasks/Item10870: support skinning of the history topic. Foswiki:Tasks/Item10870: support definition of session preferences from the publish form. Foswiki:Tasks/Item10843: bugfix to publishers control centre |
 |  2.2.1 (25 May 2011) | Foswiki:Tasks/Item10578: allow list of publishskins; Foswiki:Tasks/Item10580: allow empty outfile param; Foswiki:Tasks/Item10585: support all valid topic names in topiclist; Foswiki:Tasks/Item10578: made template purging configurable Foswiki:Tasks/Item10594: merged patch; Foswiki:Tasks/Item10581: correct paths to resources in HTML output. (Diab Jerius and Crawford Currie) |
