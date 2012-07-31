@@ -105,10 +105,9 @@ sub _PUBLISHING_GENERATORS {
     # Get a list of available generators
     my @list;
     foreach my $place (@INC) {
-        print STDERR "BLAH $place\n";
         my $d;
         if ( opendir( $d, "$place/Foswiki/Plugins/PublishPlugin/BackEnd" ) ) {
-            foreach my $gen ( readdir $d ) {
+            foreach my $gen ( sort readdir $d ) {
                 next unless ( $gen =~ /^(\w+)\.pm$/ );
                 my $name  = $1;
                 my $entry = $format;
