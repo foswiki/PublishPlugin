@@ -277,6 +277,9 @@ ISBN=1-56592-149-6
 	  For example, you might want to use =viewpdf= to render a PDF version of the
 	  topic (if you have this action available). See [[Skins]] for a list of the
 	  template files available by default.
+
+          See [[#WhereToFindTheOutput][where to find the output]] for a complete
+	  description of where the output is generated.
 	  </td>
 	  <td class="paramCol">
 	    =templates=
@@ -310,11 +313,8 @@ ISBN=1-56592-149-6
   </tr>
   <tr>
     <td colspan="4">
-      The output will be generated on the server, in the directory pointed to by the ={PublishPlugin}{Dir}= [[%SCRIPTURL{configure}%#PublishPlugin$Extensions][configuration setting]]. Administrators can
-      manage the contents of this directory from the browser using the
-      =%<nop>PUBLISHERS_CONTROL_CENTRE%= macro
-	(See PublishPluginControlCentre).<br />
-	%X% The rendered data can get pretty big, and the process itself puts a heavy load on the server, especially when using compression on large webs.
+      See [[#WhereToFindTheOutput][where to find the output]] for details of
+      where output is created on the server.<br />
     </td>
   </tr>
   <tr>
@@ -366,7 +366,7 @@ ISBN=1-56592-149-6
 	    <input type="text" size="30" name="outfile" value="" class="foswikiInputField" title="Defaults to the name of the generator" />
 	  </td>
 	  <td class="infoCol">
-	    Specify the root of the target output file name. For example, if this is set to =news= and you publish to PDF, the output will be in =news.pdf=. When publishing to HTML, this will be used as the name of the subdirectory where the HTML will be stored. The default is to use the name of the format e.g. =pdf.pdf=. 
+	    Specify the root of the target output file name. 
 	  </td>
 	  <td class="paramCol">
 	    =outfile=
@@ -407,6 +407,9 @@ ISBN=1-56592-149-6
 	  <td class="infoCol">
 	    Path of a directory relative to ={PublishPlugin}{Dir}= where you want the output generated. '/' means generate the output directly in
 	    ={PublishPlugin}{Dir}=. This allows you to keep different publishings of the same content separated.
+
+	    See [[#WhereToFindTheOutput][where to find the output]] for a complete
+	    description of where the output is generated.
 	  </td>
 	  <td class="paramCol">
 	    =relativedir=
@@ -578,6 +581,23 @@ A wildcard is a special string that you can put into a filename so that it match
 | ? | Matches any single character. | Example1? | Example10 and Example 1X but _not_ example1 |
 | [...] | Matches any one of the enclosed characters.  A pair of characters separated by a hyphen denotes a range  expression; any  character that sorts between those two characters, inclusive, using the current locale's collating sequence and character set, is matched.  If the first character following the [ is a ^ then any character not enclosed is matched. A - may be matched by including it as the first or  last  character  in  the set.  A ] may be matched by including it as the first character in the set.<br /> Within  [  and ], character classes can be specified using the syntax [:class:], where class is one of the following classes defined in the POSIX.2 standard: =alnum=, =alpha=, =ascii=, =blank=, =cntrl=, =digit=, =graph=, =lower=, =print=, =punct=, =space=, =upper=, =word=, =xdigit=. A character class matches any character belonging to that class.  The =word= character class matches letters, digits, and the character _. | B[aeiou]g | Bag, Bog, Big, Beg, Bug |
 
+#WhereToFindTheOutput
+---+++ Where to find the output
+Output is generated in the directory specified by the ={PublishPlugin}{Dir}= [[%SCRIPTURL{configure}%#PublishPlugin$Extensions][configuration setting]]. Administrators can
+manage the contents of this directory from the browser using the
+=%<nop>PUBLISHERS_CONTROL_CENTRE%= macro (see PublishPluginControlCentre).
+
+ The full path to the output depends on the settings of =relativedir= and =templates= in use. The full (file) path is given by:
+
+={PublishPlugin}{Dir}= / _relativedir_ / _template_ / _outfile_
+
+If _relativedir_ is not set, then it will be omitted from the path.
+The _template_ is only included in the path when the publishing template is *not* the =view= template.
+
+If _outfile_ is not set in the parameters it defaults to the name of the format being published. Most formats generate a single file with a unique extension that identifies the format e.g. =.pdf=. When publishing a format that generates multiple files (e.g. =file=) then the final path will refer to a directory.
+
+%X% The rendered data can get pretty big, and the publishing process itself puts a heavy load on the server, especially when using compression on large webs.
+
 #RegularExpression
 ---+++ Regular Expressions
 A perl regular expression. You can use a simple string here, which will be matched exactly, or you can read up on perl regular expressions on the web. 
@@ -638,7 +658,7 @@ Just =cd= to the =bin= directory, and
 perl -T rest /PublishPlugin/publish web=Book exclusions='Web*' format=file
 perl -T rest /PublishPlugin/publish web=Book inclusions=WebBook format=pdf extras='--book --duplex --toclevels=5'
 </verbatim>
-The available parameter names are shown in the publish form above, in the last column.
+The available parameter names are shown in the publish form above, in the last column. Where parameters take multiple values (e.g. =preferences=) then you can separate the values using semicolons.
 
 ---+++ Controlling which parts of a topic get published
 You can control what gets published from a topic using =%<nop>STARTPUBLISH%= and =%<nop>STOPPUBLISH%= control tags:
@@ -663,7 +683,7 @@ The history topic contains a list of all the parameters used, and the versions o
 
 *IMPORTANT* Run =configure= and complete the installation in the *PublishPlugin* section.
 
-If you want to generate PDF files, you will need an installation of a PDF generator, for example =htmldoc= or =prince=. Find them using google.
+If you want to generate PDF files, you will need to install a PDF generator, for example =htmldoc= or =prince=. Find them using google.
 
 Note that =htmldoc= can also be used to generate !PostScript by using the =-t= option in the =Other output generator options= above. See the =htmldoc= man pages for details.
 
