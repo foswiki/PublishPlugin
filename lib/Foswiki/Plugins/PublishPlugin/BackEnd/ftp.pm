@@ -215,6 +215,10 @@ sub close {
         $this->{ftp_interface} = undef;
     }
 
+    # Kill local copies
+    my $tmpdir = "$this->{path}$this->{params}->{outfile}";
+    File::Path::rmtree($tmpdir);
+
     return $landed;
 }
 

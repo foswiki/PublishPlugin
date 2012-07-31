@@ -52,7 +52,8 @@ sub close {
     eval { File::Path::mkpath($dir) };
     die $@ if ($@);
 
-    my @files = ("$dir$this->{params}->{outfile}/master.html");
+    my $tmpdir = "$dir$this->{params}->{outfile}";
+    my @files  = ("$tmpdir/master.html");
 
     my $cmd = $Foswiki::cfg{PublishPlugin}{PDFCmd};
     die "{PublishPlugin}{PDFCmd} not defined" unless $cmd;
@@ -76,7 +77,7 @@ sub close {
     $this->{logger}->logError("htmldoc failed: $exit/$data/$@") if $exit;
 
     # Get rid of the temporaries
-    unlink( @{ $this->{files} } );
+    File::Path::rmtree($tmpdir);
 
     return $landed;
 }

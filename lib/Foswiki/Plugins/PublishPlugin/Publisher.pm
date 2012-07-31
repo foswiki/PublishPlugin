@@ -163,9 +163,6 @@ sub new {
             session         => $session,
             templatesWanted => 'view',
 
-            # used to prefix alternate template renderings
-            templateLocation => '',
-
             # this records which templates (e.g. view, viewprint, viuehandheld,
             # etc) have been referred to and thus should be generated.
             templatesReferenced => {},
@@ -982,14 +979,10 @@ sub _rewriteTemplateReferences {
 }
 
 # Where alternative templates (e.g. viewprint) renderings end up
-# This gets appended onto puburl and pubdir
-# The web is prefixed before this.
-# Do not prepend with a /
 sub _dirForTemplate {
     my ( $this, $template ) = @_;
     return '' if ( $template eq 'view' );
-    return $template unless $this->{templateLocation};
-    return "$this->{templateLocation}/$template/";
+    return $template;
 }
 
 # SMELL this needs to be table driven
@@ -1209,19 +1202,28 @@ sub _handleNewLink {
 
 # return a relative path to a resource given a location to a resource
 # and the path to the current output directory.  the various stages of
-# cleanup may cause a path to get run through this function multiple
+# cleanup may cause a path to be run through this function multiple
 # times; make sure that we only modify the path the first time.
 sub _rsrcpath {
 
     my ( $this, $odir, $rsrcloc ) = @_;
 
+    # if path is already relative or URLish, return it
+    return $rsrcloc if $rsrcloc =~ m{^(\.+/|[a-z]+:)};
+
     $odir = "/$odir" unless $odir =~ /^\//;
 
-    # if path is already relative or URLish, return it
-    return $rsrcloc if $rsrcloc =~ m{^(?:\.+/|[a-z]+:)};
+    # See if the generator wants to deal with this resource
+    my $nloc;
+    if ( $this->{archive}->can('mapResourceURL') ) {
+        $nloc = $this->{archive}->mapResourceURL( $odir, $rsrcloc );
+    }
 
-    # relative path to rsrc dir from output dir
-    my $nloc = File::Spec->abs2rel( $rsrcloc, $odir );
+    unless ($nloc) {
+
+        # relative path to rsrc dir from output dir
+        $nloc = File::Spec->abs2rel( $rsrcloc, $odir );
+    }
 
     # ensure there's an explicit relative path so it can
     # be identified next time 'round

@@ -47,6 +47,8 @@ sub addString {
     my ( $this, $string, $file ) = @_;
 
     if ( $file !~ /\.html$/ ) {
+
+        # Not .html, create a resource file for it
         $this->SUPER::addString( $string, $file );
         return;
     }
@@ -87,12 +89,22 @@ sub _encodeAnchor {
 # Convert a topic URL to an anchor references
 sub mapTopicURL {
     my ( $this, $path ) = @_;
-    print STDERR "CUNT $path\n";
     if ( $path =~ /(#.*)$/ ) {
         return $1;
     }
     $path = '#' . _encodeAnchor($path);
     return $path;
+}
+
+sub mapResourceURL {
+    my ( $this, $odir, $rsrcloc ) = @_;
+
+    # Resource locations are specified relative to the root.
+    # Since master.html is already at the root, no more transforms
+    # are required to create a relative path, except to remove any
+    # /
+    $rsrcloc =~ s/^\/*//;
+    return $rsrcloc;
 }
 
 sub close {
