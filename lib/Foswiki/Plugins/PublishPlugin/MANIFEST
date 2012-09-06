@@ -1,7 +1,6 @@
 data/System/PublishPlugin.txt 0644
 data/System/PublishPluginControlCentre.txt 0644
 data/System/PublishWeb.txt 0644
-pub/System/PublishPlugin/publish.gif 0644
 lib/Foswiki/Plugins/PublishPlugin.pm 0444
 lib/Foswiki/Plugins/PublishPlugin/Config.spec 0444
 lib/Foswiki/Plugins/PublishPlugin/Publisher.pm 0444
