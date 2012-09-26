@@ -279,7 +279,7 @@ sub _loadConfigTopic {
     foreach my $line ( split( /\r?\n/, $cfgt ) ) {
         next
           unless $line =~
-              /^\s+\*\s+Set\s+(?:PUBLISH_)?([A-Z]+)\s*=\s*(.*?)\s*$/;
+          /^\s+\*\s+Set\s+(?:PUBLISH_)?([A-Z]+)\s*=\s*(.*?)\s*$/;
 
         my $k = lc($1);
         my $v = $2;

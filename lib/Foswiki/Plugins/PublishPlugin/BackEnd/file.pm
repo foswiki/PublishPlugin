@@ -149,7 +149,7 @@ sub close {
         my @files = split( /[,\s]+/, $this->{params}->{googlefile} );
         for my $file (@files) {
             my $simplehtml =
-                '<html><title>' 
+                '<html><title>'
               . $file
               . '</title><body>just for google</body></html>';
             $this->addString( $simplehtml, $file );
@@ -178,7 +178,7 @@ HERE
         map {
                 "$topicTemplatePre$this->{params}->{relativeurl}"
               . "$_$topicTemplatePost\n"
-          } @$filesRef
+        } @$filesRef
     );
 
     $map =~ s/%URLS%/$urls/;
