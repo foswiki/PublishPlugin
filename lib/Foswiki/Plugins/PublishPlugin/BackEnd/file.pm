@@ -31,7 +31,7 @@ sub new {
     my $class = shift;
     my $this  = $class->SUPER::new(@_);
 
-    my $oldmask = umask( oct(777) - $Foswiki::cfg{RCS}{dirPermission} );
+    my $oldmask = umask( oct(777) - ($Foswiki::cfg{RCS}{dirPermission}||$Foswiki::cfg{Store}{dirPermission}) );
     $this->{params}->{outfile} ||= 'file';
 
     if ( -e "$this->{path}/$this->{params}->{outfile}" ) {
@@ -67,7 +67,7 @@ sub param_schema {
 sub addDirectory {
     my ( $this, $name ) = @_;
 
-    my $oldmask = umask( oct(777) - $Foswiki::cfg{RCS}{dirPermission} );
+    my $oldmask = umask( oct(777) - ($Foswiki::cfg{RCS}{dirPermission}||$Foswiki::cfg{Store}{dirPermission}) );
     eval { File::Path::mkpath("$this->{path}$this->{params}->{outfile}/$name") };
     $this->{logger}->logError($@) if $@;
     umask($oldmask);

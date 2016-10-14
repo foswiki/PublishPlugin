@@ -104,7 +104,14 @@ sub _foswiki1x1 {
           foreach grep { /^JQUERYPLUGIN::/ } keys %$zone;
     }
 
-    my $result = $Foswiki::Plugins::SESSION->_renderZones($tmpl);
+    my $result;
+    if ( $Foswiki::Plugins::SESSION->can("_renderZones") ) {
+        # Foswiki 1.1 up to 2.0
+        $result = $Foswiki::Plugins::SESSION->_renderZones($tmpl);
+    } else {
+        # Foswiki 2.1 and later
+        $result = $Foswiki::Plugins::SESSION->zones()->_renderZones($tmpl);
+    }
 
     $this->{_zones}{$_} = $zones{$_} for keys %zones;
 
