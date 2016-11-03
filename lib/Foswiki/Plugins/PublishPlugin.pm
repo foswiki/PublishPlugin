@@ -39,12 +39,17 @@ sub initPlugin {
 "Can't publish because no useable {PublishPlugin}{Dir} was found. Please notify your Wiki administrator";
     }
 
-    Foswiki::Func::registerRESTHandler( 'publish', \&_publishRESTHandler );
+    Foswiki::Func::registerRESTHandler(
+        'publish', \&_publishRESTHandler,
+        authenticate => 1,             # Block save unless authenticated
+        validate     => 1,             # Check the strikeone / embedded CSRF key
+        http_allow   => 'GET,POST',    # Restrict to POST for updates
+    );
     Foswiki::Func::registerTagHandler( 'PUBLISHERS_CONTROL_CENTRE',
         \&_PUBLISHERS_CONTROL_CENTRE );
     Foswiki::Func::registerTagHandler( 'PUBLISHING_GENERATORS',
         \&_PUBLISHING_GENERATORS );
-    return 1;    # coupersetique
+    return 1;                          # coupersetique
 }
 
 sub _publishRESTHandler {
