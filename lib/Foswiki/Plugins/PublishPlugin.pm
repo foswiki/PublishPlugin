@@ -12,8 +12,8 @@ use Foswiki::Func ();
 use Error qw( :try );
 use Assert;
 
-our $VERSION = '$Rev$';
-our $RELEASE = '2.4.0';
+our $VERSION = '25 Jan 2017';
+our $RELEASE = '2.50';
 our $SHORTDESCRIPTION =
 'Generate static output (HTML, PDF) optionally upload (FTP) the output to a publishing site.';
 
@@ -229,6 +229,7 @@ __END__
 # Copyright (C) 2002, Eric Scouten
 # Copyright (C) 2005-2011 Crawford Currie, http://c-dot.co.uk
 # Copyright (C) 2006 Martin Cleaver, http://www.cleaver.org
+# Copyright (C) 2006-2017, Foswiki Contributors
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
