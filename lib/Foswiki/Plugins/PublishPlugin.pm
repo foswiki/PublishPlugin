@@ -12,8 +12,8 @@ use Foswiki::Func ();
 use Error qw( :try );
 use Assert;
 
-our $VERSION = '25 Jan 2017';
-our $RELEASE = '2.50';
+our $VERSION = '2.50';
+our $RELEASE = '25 Jan 2017';
 our $SHORTDESCRIPTION =
 'Generate static output (HTML, PDF) optionally upload (FTP) the output to a publishing site.';
 
