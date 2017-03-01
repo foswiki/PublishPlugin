@@ -40,9 +40,15 @@ sub new {
 
     $this->{params}->{fastupload} ||= 0;
     if ( $this->{params}->{destinationftpserver} ) {
-        if ( $this->{params}->{destinationftppath} =~ /^\/?(.*)$/ ) {
-            $this->{params}->{destinationftppath} = $1;
+        if ( defined $this->{params}->{destinationftppath} ) {
+            if ( $this->{params}->{destinationftppath} =~ /^\/?(.*)$/ ) {
+                $this->{params}->{destinationftppath} = $1;
+            }
         }
+        else {
+            $this->{params}->{destinationftppath} = '';
+        }
+
         $this->{logger}->logInfo( '', "fastUpload = $this->{fastupload}" );
     }
 
@@ -52,23 +58,11 @@ sub new {
 sub param_schema {
     my $class = shift;
     return {
-        destinationftpserver => {
-            validator =>
-              \&Foswiki::Plugins::PublishPlugin::Publisher::validateNonEmpty
-        },
-        destinationftppath => {
-            validator =>
-              \&Foswiki::Plugins::PublishPlugin::Publisher::validateNonEmpty
-        },
-        destinationftpusername => {
-            validator =>
-              \&Foswiki::Plugins::PublishPlugin::Publisher::validateNonEmpty
-        },
-        destinationftppassword => {
-            validator =>
-              \&Foswiki::Plugins::PublishPlugin::Publisher::validateNonEmpty
-        },
-        fastupload => { default => 1 },
+        destinationftpserver   => {},
+        destinationftppath     => {},
+        destinationftpusername => {},
+        destinationftppassword => {},
+        fastupload             => { default => 1 },
         %{ $class->SUPER::param_schema() }
     };
 }
@@ -217,8 +211,11 @@ sub close {
 
     # Kill local copies
     my $tmpdir = "$this->{path}$this->{params}->{outfile}";
-    File::Path::rmtree($tmpdir);
+    if ( $this->{params}->{destinationftpserver} ) {
 
+        # There's a server, we should expect an upload
+        File::Path::rmtree($tmpdir);
+    }
     return $landed;
 }
 
