@@ -999,6 +999,10 @@ sub _filetypeForTemplate {
 #   * =\%copied= - map of copied resources to new locations
 sub _copyResource {
     my ( $this, $srcName, $copied ) = @_;
+
+    # srcName is a URL. Expand it.
+    $srcName = Foswiki::urlDecode($srcName);
+
     my $rsrcName = $srcName;
 
     # Trim the resource name, as they can sometimes pick up whitespaces
