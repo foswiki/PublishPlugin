@@ -103,10 +103,11 @@ table.publishForm .paramCol {
       Web
     </td>
     <td class="inputCol">
-      <select name="web" class="foswikiSelect">%WEBLIST{"<option $marker value='$name'>$name</option>" selection="%URLPARAM{"web" default="%WEB%" encode="entity"}%"}%</select>
+      <select name="web" class="foswikiSelect">
+      <option value=""></option>%WEBLIST{"<option $marker value='$name'>$name</option>" selection="%URLPARAM{"web" default="%WEB%" encode="entity"}%"}%</select>
     </td>
     <td class="infoCol">
-      The Web to publish. This is required to provide a context for the publishing process (e.g. web preference settings), even if all topics in the =topiclist= have explicit web names.
+      This is required to provide a context for the publishing process (e.g. web preference settings), even if all topics in the =topics= have explicit web names. If the list of topics is blank, all topics in this web will be published.
     </td>
     <td class="paramCol">
       =web=
@@ -117,7 +118,7 @@ table.publishForm .paramCol {
       Topic List
     </td>
     <td class="inputCol"> 
-      <input type="text" name="topiclist" class="foswikiInputField" value="%URLPARAM{"topiclist" default="" encode="entity"}%" size="30" title="Leave blank to publish all topics in the web"/>
+      <input type="text" name="topics" class="foswikiInputField" value="%URLPARAM{"topics" default="" encode="entity"}%" size="30" title="Leave blank to publish all topics in the web"/>
     </td>
     <td class="infoCol">
       Comma-separated list of topic names.
@@ -128,12 +129,12 @@ table.publishForm .paramCol {
 
 	You can also use the [[#BookMaker][Bookmaker]] (see [[#Using_Bookmaker][Using Bookmaker]], below) to build such lists, and include them using the =%<nop>BOOKLIST{"Bookweb.BookName"}%= macro.
 
-	A non-blank =topiclist= is still subject to filtering against =inclusions= and =exclusions=.
+	Does not support wildcards. However a non-blank =topics= is still subject to filtering against =inclusions= and =exclusions=.
 	  
 	Note that this list can include topics in other webs, by referring to them using the =Web.TopicName= syntax.
     </td>
     <td class="paramCol">
-      =topiclist=
+      =topics=
     </td>
   </tr>
   <tr>
@@ -142,7 +143,7 @@ table.publishForm .paramCol {
       <table class="foswikiTable publishForm">
       	<tr> 
       	  <td class="nameCol"> 
-	    Include filter
+	    Topic Include Filter
 	  </td>
 	  <td class="inputCol"> 
 	    <input type="text" name="inclusions" class="foswikiInputField" value="%URLPARAM{"inclusions" default="*" encode="entity"}%" size="30" title="Use * to publish all topics in the topic list" />
@@ -154,7 +155,7 @@ table.publishForm .paramCol {
         </tr>
 	<tr class="expert">
 	  <td class="nameCol"> 
-	    Exclude filter
+	    Topic Exclude Filter
 	  </td>
 	  <td class="inputCol"> 
 	    <input type="text" name="exclusions" class="foswikiInputField" value="%URLPARAM{"exclusions" default="" encode="entity"}%" size="30" title="Leave blank to include all topics in the topic list" />
@@ -168,7 +169,7 @@ table.publishForm .paramCol {
 	</tr>
 	<tr class="expert">
 	  <td class="nameCol"> 
-	    Versions
+	    Versions Topic
 	  </td>
 	  <td class="inputCol"> 
 	    <input type="text" name="versions" class="foswikiInputField" value="%URLPARAM{"versions" default="" encode="entity"}%" size="30" title="Leave blank to publish the most recent version of each topic"/>
@@ -184,16 +185,16 @@ table.publishForm .paramCol {
 	</tr>
 	<tr class="expert">
 	  <td class="nameCol"> 
-	    Filter topic contents
+	    Content Filter
 	  </td>
 	  <td class="inputCol"> 
-	    <input type="text" name="topicsearch" class="foswikiInputField" value="%URLPARAM{"filter" default="" encode="entity"}%" size="30" title="Leave blank to include all topics"/>
+	    <input type="text" name="rexclude" class="foswikiInputField" value="%URLPARAM{"filter" default="" encode="entity"}%" size="30" title="Leave blank to include all topics"/>
 	  </td>
 	  <td class="infoCol">
 	    A [[#RegularExpression][regular expression]] that will cause a topic to be excluded if the RE matches the topic content.
 	  </td>
 	  <td class="paramCol">
-	    =topicsearch=
+	    =rexclude=
 	  </td>
 	</tr>
       </table>
@@ -304,6 +305,20 @@ ISBN=1-56592-149-6
             =copyexternal=
           </td>
  	</tr>
+        <tr class="expert">
+          <td class="nameCol">Publish All Attachments </td>
+          <td class="inputCol">
+            <input type="checkbox" name="allattachments" class="foswikiCheckbox" />
+          </td>
+          <td class="infoCol">
+            Normally only attachments that are explicitly referenced in the
+            text are published. Enable this option to publish attachments
+            on topics that are not referenced in the text as well.
+          </td>
+          <td class="paramCol">
+            =allattachments=
+          </td>
+ 	</tr>
       </table>
       %ENDTWISTY%
     </td>
@@ -403,10 +418,10 @@ ISBN=1-56592-149-6
 	    Extended directory path
 	  </td>
 	  <td class="inputCol">
-	    <input type="text" size="30" name="relativedir" value="/" class="foswikiInputField" title="Use / to publish directly in {PublishPlugin}{Dir}" />
+	    <input type="text" size="30" name="relativedir" value="" class="foswikiInputField" title="Use / to publish directly in {PublishPlugin}{Dir}" />
 	  </td>
 	  <td class="infoCol">
-	    Path of a directory relative to ={PublishPlugin}{Dir}= where you want the output generated. '/' means generate the output directly in
+	    Path of a directory relative to ={PublishPlugin}{Dir}= where you want the output generated. / (or undefined) means generate the output directly in
 	    ={PublishPlugin}{Dir}=. This allows you to keep different publishings of the same content separated.
 
 	    See [[#WhereToFindTheOutput][where to find the output]] for a complete
@@ -642,7 +657,7 @@ The Bookmaker allows you to select a number of topics by visiting them in turn a
 
 To start the bookmaker, %IF{"context 'BookmakerPluginEnabled'"
  then="$percntBUTTON{\"click here\" class=\"bookmaker_button\" href=\"%SCRIPTURL{view}%/%SYSTEMWEB%/BookmakerPlugin?open_bookmaker=Sandbox.WebOrder\"}$percnt"
- else="enable the !BookmakerPlugin, and revisit this page to enable the interface"}%. Once the bookmaker is running, visit the pages you want to add to the book and add them to the book. Once you are finished, use the bookmaker interface to return to this page to publish the results. To publish a book generated by Bookmaker, use the =%<nop>BOOKLIST{"Bookweb.BookName"}%= macro in the =topiclist= parameter.
+ else="enable the !BookmakerPlugin, and revisit this page to enable the interface"}%. Once the bookmaker is running, visit the pages you want to add to the book and add them to the book. Once you are finished, use the bookmaker interface to return to this page to publish the results. To publish a book generated by Bookmaker, use the =%<nop>BOOKLIST{"Bookweb.BookName"}%= macro in the =topics= parameter.
 
 #PublishTopic
 ---+++ Using a Publish Topic (configtopic)

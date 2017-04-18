@@ -19,20 +19,47 @@ BEGIN {
     }
 }
 
-my %parameters = (
-    copyexternal  => { default   => 1 },
-    debug         => { default   => 0 },
-    enableplugins => { validator => \&_validateList },
-    exclusions    => { default   => '', validator => \&_wildcard2RE },
-    format        => { default   => 'file', validator => \&_validateWord },
+my %PARAM_SCHEMA = (
+    allattachments => { desc => 'Publish All Attachments' },
+    copyexternal   => {
+        default => 1,
+        desc    => 'Copy Off-Wiki Resources'
+    },
+    enableplugins => {
+        validator => \&_validateList,
+        desc      => 'Enable Plugins'
+    },
+    exclusions => {
+        validator => \&_wildcard2RE,
+        desc      => 'Topic Exclude Filter'
+    },
+    format => {
+        default   => 'file',
+        validator => \&_validateWord,
+        desc      => 'Output Generator'
+    },
     history => {
         default   => '',
-        validator => \&_validateTopicNameOrNull
+        validator => \&_validateTopicNameOrNull,
+        desc      => 'History Topic'
     },
-    inclusions  => { default => '.*', validator => \&_wildcard2RE },
-    preferences => { default => '' },
-    publishskin => { validator => \&_validateList },
-    relativedir => { default   => '', validator => \&_validateRelPath },
+    inclusions => {
+        validator => \&_wildcard2RE,
+        desc      => 'Topic Include Filter'
+    },
+    preferences => {
+        default => '',
+        desc    => 'Extra Preferences'
+    },
+    publishskin => {
+        validator => \&_validateList,
+        desc      => 'Publish Skin'
+    },
+    relativedir => {
+        default   => '/',
+        validator => \&_validateRelPath,
+        desc      => 'Relative Path'
+    },
     rsrcdir => {
         default   => '/rsrc',
         validator => sub {
@@ -42,20 +69,35 @@ my %parameters = (
             return "/$v";
           }
     },
-    templates => { default => 'view', validator => \&_validateList },
-    topiclist => {
+    templates => {
+        default   => 'view',
+        validator => \&_validateList,
+        desc      => 'Using Templates'
+    },
+    topics => {
         default        => '',
         allowed_macros => 1,
-        validator      => \&_validateTopicNameList
+        validator      => \&_validateTopicNameList,
+        desc           => 'Topics'
     },
-    topicsearch => { default => '', validator => \&_validateRE },
-    versions => { validator => \&_validateList },
+    rexclude => {
+        default   => '',
+        validator => \&_validateRE,
+        desc      => 'Content Filter'
+    },
+    versions => {
+        validator => \&_validateList,
+        desc      => 'Versions Topic'
+    },
+    web => { validator => \&_validateWebName },
 
     # Renamed options
-    filter   => { renamed => 'topicsearch' },
-    instance => { renamed => 'relativedir' },
-    genopt   => { renamed => 'extras' },
-    skin     => { renamed => 'publishskin' }
+    filter      => { renamed => 'rexclude' },
+    instance    => { renamed => 'relativedir' },
+    genopt      => { renamed => 'extras' },
+    topicsearch => { renamed => 'rexclude' },
+    skin        => { renamed => 'publishskin' },
+    topiclist   => { renamed => 'topics' }
 );
 
 sub _wildcard2RE {
@@ -120,6 +162,14 @@ sub _validateTopicName {
     die "Invalid $k: '$v'";
 }
 
+sub _validateWebName {
+    my $v = shift;
+    return '' unless defined $v && $v ne '';
+    die "Invalid web name '$v'"
+      unless $Foswiki::Plugins::SESSION->webExists($v);
+    return Foswiki::Sandbox::untaintUnchecked($v);
+}
+
 sub _validateWord {
     my $v = shift;
     if ( $v =~ /^(\w+)$/ ) {
@@ -149,6 +199,7 @@ sub validateFilename {
 
 sub _validateRelPath {
     my $v = shift;
+    return '' unless $v;
     $v .= '/';
     $v =~ s#//+#/#;
     $v =~ s#^/##;
@@ -160,105 +211,81 @@ sub _validateRelPath {
     die "Invalid $k: '$v'";
 }
 
-sub new {
-    my ( $class, $session ) = @_;
+# Create a parameter hash from a CGI query
+sub _loadParams {
+    my ( $this, $data ) = @_;
 
-    my $this = bless(
-        {
-            session         => $session,
-            templatesWanted => 'view',
-
-            # this records which templates (e.g. view, viewprint, viuehandheld,
-            # etc) have been referred to and thus should be generated.
-            templatesReferenced => {},
-
-            # serial number for giving unique names to external resources
-            nextExternalResourceNumber => 0,
-        },
-        $class
-    );
-    my $query = Foswiki::Func::getCgiQuery();
-    my $data;
-    if ( $query && $query->param('configtopic') ) {
-        $this->{configtopic} = $query->param('configtopic');
-        $query->delete('configtopic');
-        $data = $this->_loadConfigTopic();
+    if ( ref($data) eq 'HASH' ) {
+        my $d = $data;
+        $data = sub { return $d->{ $_[0] }; };
     }
-    elsif ($query) {
-        $data = $query->Vars;
+
+    # Set up our context
+    $this->{web} = &$data('web') // $Foswiki::cfg{SystemWebName};
+
+    if ( &$data('configtopic') ) {
+        my @wl = split( / *, */, $this->{web} );
+        my ( $cw, $ct ) =
+          Foswiki::Func::normalizeWebTopicName( $wl[0], $data->{config_topic} );
+        my $d = _loadConfigTopic( $cw, $ct );
+        $data = sub { return $d->{ $_[0] }; };
     }
 
     # Try and build the generator first, so we can pull in param defs
-    $data->{format} ||= 'file';
-    die "Bad output format '$data->{format}'"
-      unless $data->{format} =~ /^(\w+)$/;
+    my $format = &$data('format') || 'file';
+    unless ( $format =~ /^(\w+)$/ ) {
+        die "Bad output format '$format'";
+    }
+
+    # Implicit untaint
     $this->{generator} = 'Foswiki::Plugins::PublishPlugin::BackEnd::' . $1;
     eval 'use ' . $this->{generator};
 
     if ($@) {
-        die "Failed to initialise '$data->{format}' generator: $@";
+        die "Failed to initialise '$this->{generator}': $@";
     }
 
-    foreach my $phash ( \%parameters, $this->{generator}->param_schema() ) {
-        foreach my $k ( keys %$phash ) {
-            if ( defined( $data->{$k} ) ) {
-                my $v = $data->{$k};
-                $this->_setArg( $k, $v, $phash );
-                $query->delete($k) if $query;
+    my $gen_schema = $this->{generator}->param_schema();
+
+    my %schema;
+    map { $schema{$_} = $PARAM_SCHEMA{$_} } keys %PARAM_SCHEMA;
+    map { $schema{$_} = $gen_schema->{$_} } keys %$gen_schema;
+
+    $this->{schema} = \%schema;
+    my %opt;
+
+    while ( my ( $k, $spec ) = each %schema ) {
+        if ( defined( &$data($k) ) ) {
+            my $v = &$data($k);
+
+            while ( defined $spec->{renamed} ) {
+                $k    = $spec->{renamed};
+                $spec = $schema{$k};
+            }
+            if ( defined $spec->{allowed_macros} ) {
+                $v = Foswiki::Func::expandCommonVariables($v);
+            }
+            if ( $spec->{default} && $v eq $spec->{default} ) {
+                $opt{$k} = $spec->{default};
+            }
+            elsif ( defined $spec->{validator} ) {
+                $opt{$k} = &{ $spec->{validator} }( $v, $k );
             }
             else {
-                $this->{$k} = $phash->{$k}->{default};
+                $opt{$k} = $v;
             }
         }
-    }
-
-    # 'compress' undocumented but retained for compatibility
-    if ( $query && defined $query->param('compress') ) {
-        my $v = $query->param('compress');
-        if ( $v =~ /(\w+)/ ) {
-            $this->{format} = $1;
+        else {
+            $opt{$k} = $spec->{default};
         }
     }
-
-    $this->{publishskin} ||= Foswiki::Func::getPreferencesValue('PUBLISHSKIN')
-      || 'basic_publish';
-
-    $this->{historyText} = '';
-    return $this;
-}
-
-sub finish {
-    my $this = shift;
-    $this->{session} = undef;
-}
-
-sub _setArg {
-    my ( $this, $k, $v, $phash ) = @_;
-    my $spec = $phash->{$k};
-    $k = $spec->{renamed}
-      if defined $spec->{renamed};
-    if ( defined $spec->{allowed_macros} ) {
-        $v = Foswiki::Func::expandCommonVariables($v);
-    }
-    if ( $spec->{default} && $v eq $spec->{default} ) {
-        $this->{$k} = $spec->{default};
-    }
-    elsif ( defined $spec->{validator} ) {
-        $this->{$k} = &{ $spec->{validator} }( $v, $k );
-        ASSERT( UNTAINTED( $this->{$k} ), $k ) if DEBUG;
-    }
-    else {
-        $this->{$k} = $v;
-    }
+    $this->{opt} = \%opt;
 }
 
 sub _loadConfigTopic {
-    my ($this) = @_;
+    my ( $cw, $ct ) = @_;
 
     # Parameters are defined in config topic
-    my ( $cw, $ct ) =
-      Foswiki::Func::normalizeWebTopicName( $this->{web},
-        $this->{configtopic} );
     unless ( Foswiki::Func::topicExists( $cw, $ct ) ) {
         die "Specified configuration topic $cw.$ct does not exist!";
     }
@@ -269,16 +296,15 @@ sub _loadConfigTopic {
     my ( $cfgm, $cfgt ) = Foswiki::Func::readTopic( $cw, $ct );
     unless (
         Foswiki::Func::checkAccessPermission(
-            "VIEW", $this->{publisher}, $cfgt, $ct, $cw
+            "VIEW", Foswiki::Func::getWikiName(),
+            $cfgt, $ct, $cw
         )
       )
     {
         die "Access to $cw.$ct denied";
     }
 
-    $cfgt =
-      Foswiki::Func::expandCommonVariables( $cfgt, $this->{configtopic},
-        $this->{web}, $cfgm );
+    $cfgt = Foswiki::Func::expandCommonVariables( $cfgt, $ct, $cw, $cfgm );
 
     # SMELL: common preferences parser?
     my %data;
@@ -295,12 +321,42 @@ sub _loadConfigTopic {
     return \%data;
 }
 
+sub new {
+    my ( $class, $params, $session ) = @_;
+
+    my $this = bless(
+        {
+            session         => $session,
+            templatesWanted => 'view',
+
+            # this records which templates (e.g. view, viewprint, viuehandheld,
+            # etc) have been referred to and thus should be generated.
+            templatesReferenced => {},
+
+            # serial number for giving unique names to external resources
+            nextExternalResourceNumber => 0,
+        },
+        $class
+    );
+
+    $this->_loadParams($params);
+    $this->{opt}->{publishskin} ||=
+      Foswiki::Func::getPreferencesValue('PUBLISHSKIN')
+      || 'basic_publish';
+
+    $this->{historyText} = '';
+    return $this;
+}
+
+sub finish {
+    my $this = shift;
+    $this->{session} = undef;
+}
+
 sub publish {
-    my ( $this, @webs ) = @_;
+    my ($this) = @_;
 
-    $this->{publisher} = Foswiki::Func::getWikiName();
-
-    #don't add extra markup for topics we're not linking too
+    # don't add extra markup for topics we're not linking too
     # NEWTOPICLINKSYMBOL LINKTOOLTIPINFO
     if ( defined $Foswiki::Plugins::SESSION->{renderer} ) {
         $Foswiki::Plugins::SESSION->{renderer}->{NEWLINKSYMBOL} = '';
@@ -314,8 +370,8 @@ sub publish {
     my $disabledPlugins = '';
     my @pluginsToEnable;
 
-    if ( $this->{enableplugins} ) {
-        @pluginsToEnable = split( /[, ]+/, $this->{enableplugins} );
+    if ( $this->{opts}->{enableplugins} ) {
+        @pluginsToEnable = split( /[, ]+/, $this->{opt}->{enableplugins} );
     }
 
     foreach my $plugin ( keys( %{ $Foswiki::cfg{Plugins} } ) ) {
@@ -339,47 +395,31 @@ sub publish {
             $Foswiki::Plugins::SESSION->{response}
               ->print( CGI::start_html( -title => 'Foswiki: Publish' ) );
         }
-        ( $header, $footer ) = $this->_getPageTemplate();
+        ( $header, $footer ) =
+          $this->_getPageTemplate( $Foswiki::cfg{SystemWebName} );
     }
 
     $this->logInfo( '',          "<h1>Publishing Details</h1>" );
-    $this->logInfo( "Publisher", $this->{publisher} );
+    $this->logInfo( "Publisher", Foswiki::Func::getWikiName() );
     $this->logInfo( "Date",      Foswiki::Func::formatTime( time() ) );
-    $this->logInfo( "Dir",
-        "$Foswiki::cfg{PublishPlugin}{Dir}$this->{relativedir}" );
-    $this->logInfo( "URL",
-        "$Foswiki::cfg{PublishPlugin}{URL}$this->{relativeurl}" );
-    $this->logInfo( "Web(s)", join( ', ', @webs ) );
-    $this->logInfo( "Versions topic", $this->{versions} )
-      if $this->{versions};
-    $this->logInfo( "Content Generator", $this->{format} );
-    $this->logInfo( "Config topic",      $this->{configtopic} )
-      if $this->{configtopic};
-    $this->logInfo( "Skin", $this->{publishskin} );
+    foreach my $p (qw()) {
+        if ( $this->{$p} ) {
+            $this->logInfo( $this->{schema}->{$p}->{desc} // $p, $this->{$p} );
+        }
+    }
 
     # Push preference values. Because we use session preferences (preferences
     # that only live as long as the request) these values will not persist.
-    if ( $this->{preferences} ) {
+    if ( defined $this->{opt}->{preferences} ) {
         my $sep =
           Foswiki::Func::getContext()->{command_line} ? qr/;/ : qr/\r?\n/;
-        foreach my $setting ( split( $sep, $this->{preferences} ) ) {
+        foreach my $setting ( split( $sep, $this->{opt}->{preferences} ) ) {
             if ( $setting =~ /^(\w+)\s*=(.*)$/ ) {
                 my ( $k, $v ) = ( $1, $2 );
                 Foswiki::Func::setPreferencesValue( $k, $v );
-                $this->logInfo( "Preference", "$k=$v" );
             }
         }
     }
-    $this->logInfo( "Templates",         $this->{templates} );
-    $this->logInfo( "Topic list",        $this->{topiclist} );
-    $this->logInfo( "Inclusions",        $this->{inclusions} );
-    $this->logInfo( "Exclusions",        $this->{exclusions} );
-    $this->logInfo( "Content Filter",    $this->{topicsearch} );
-    $this->logInfo( "Generator Options", $this->{extras} );
-    $this->logInfo( "Enabled Plugins",   $enabledPlugins );
-    $this->logInfo( "Disabled Plugins",  $disabledPlugins );
-
-    my $firstWeb = $webs[0];
 
     # Force static context for all published topics
     Foswiki::Func::getContext()->{static} = 1;
@@ -388,25 +428,83 @@ sub publish {
     # so we can detect whether a topic is in the publish set when
     # remapping links. Note that we use /, not ., in the path. This is
     # to make matching URL paths easier.
+    my %wl;
+    if ( $this->{web} ) {
+        my @wl = split( / *, */, $this->{web} );
+
+        # Get subwebs
+        @wl = map { $_, Foswiki::Func::getListOfWebs( undef, $_ ) } @wl;
+        %wl = map { $_ => 1 } @wl;
+    }
+    else {
+        # get a list of ALL webs
+        %wl = map { $_ => 1 } Foswiki::Func::getListOfWebs();
+    }
+
+    my @webs     = sort keys %wl;
+    my $firstWeb = $webs[0];
+
     my %topics;
     foreach my $web (@webs) {
-        if ( $this->{topiclist} ) {
-            foreach my $topic ( split( /[,\s]+/, $this->{topiclist} ) ) {
+        if ( $this->{opt}->{topics} ) {
+            foreach my $topic ( split( /[,\s]+/, $this->{opt}->{topics} ) ) {
                 my ( $w, $t ) =
                   Foswiki::Func::normalizeWebTopicName( $web, $topic );
-                $topics{"$w/$t"} = 1;
+                $topics{"$w.$t"} = 1;
             }
         }
         else {
             foreach my $topic ( Foswiki::Func::getTopicList($web) ) {
-                $topics{"$web/$topic"} = 1;
+                $topics{"$web.$topic"} = 1;
             }
         }
     }
-    $this->{topics} = \%topics;
+    my @topics = sort keys %topics;
 
-    foreach my $web (@webs) {
-        $this->_publishWeb($web);
+    if ( $this->{opt}->{inclusions} ) {
+        @topics = grep { /$this->{opt}->{inclusions}/ } @topics;
+    }
+
+    if ( $this->{opt}->{exclusions} ) {
+        @topics = grep { !/$this->{opt}->{exclusions}/ } @topics;
+    }
+
+    # Determine the set of topics for each unique web
+    my %webset;
+    foreach my $t (@topics) {
+        my ( $w, $t ) = Foswiki::Func::normalizeWebTopicName( undef, $t );
+        $webset{$w} //= [];
+        push( @{ $webset{$w} }, $t );
+    }
+
+    # Open an archive for each template
+    $this->{templatesWanted} =
+      [ sort grep { !/^\s*$/ } split( /\s*,\s*/, $this->{opt}->{templates} ) ];
+
+    foreach my $template ( @{ $this->{templatesWanted} } ) {
+        my $dir =
+            $Foswiki::cfg{PublishPlugin}{Dir}
+          . $this->{relativedir}
+          . $this->_dirForTemplate($template);
+
+        File::Path::mkpath($dir);
+
+        $this->{archives}->{$template} =
+          $this->{generator}->new( $this, $dir, $this );
+    }
+
+    while ( my ( $w, $ts ) = each %webset ) {
+        $this->_publishInWeb( $w, $ts );
+    }
+
+    # Close archives
+    foreach my $template ( @{ $this->{templatesWanted} } ) {
+        my $landed = $this->{archives}->{$template}->close();
+        my $url =
+            $Foswiki::cfg{PublishPlugin}{URL}
+          . $this->{opt}->{relativedir}
+          . $landed;
+        $this->logInfo( "Published to", "<a href=\"$url\">$url</a>" );
     }
 
     if ( $this->{history} ) {
@@ -421,8 +519,7 @@ sub publish {
           )
         {
             $this->logError( <<TEXT, $footer );
-            Can't publish because $this->{publisher} can't CHANGE
-$hw.$ht.
+Cannot publish because current user cannot CHANGE $hw.$ht.
 This topic must be editable by the user doing the publishing.
 TEXT
             return;
@@ -432,7 +529,7 @@ TEXT
         my ( $meta, $text ) = Foswiki::Func::readTopic( $hw, $ht );
         my $history =
           Foswiki::Func::loadTemplate( 'publish_history',
-            $this->{publishskin} );
+            $this->{opt}->{publishskin} );
 
         # See if we have history template. Unfortunately for compatibility
         # reasons, Func::readTemplate doesn't distinguish between no template
@@ -468,16 +565,17 @@ TEXT
     Foswiki::Plugins::PublishPlugin::_display($footer);
 }
 
-sub _publishWeb {
-    my ( $this, $web ) = @_;
+# $web - the web to publish in
+# \@topics - list of topics in this web to publish
+sub _publishInWeb {
+    my ( $this, $web, $topics ) = @_;
 
-    $this->{web} = $web;
-
-    $this->logInfo( '', "<h1>Publishing web '$web'</h1>" );
-    if ( $this->{versions} ) {
+    $this->logInfo( '', "<h2>Publishing in web '$web'</h2>" );
+    if ( $this->{opt}->{versions} ) {
         $this->{topicVersions} = {};
         my ( $vweb, $vtopic ) =
-          Foswiki::Func::normalizeWebTopicName( $web, $this->{versions} );
+          Foswiki::Func::normalizeWebTopicName( $web,
+            $this->{opt}->{versions} );
         die "Versions topic $vweb.$vtopic does not exist"
           unless Foswiki::Func::topicExists( $vweb, $vtopic );
         my ( $meta, $text ) = Foswiki::Func::readTopic( $vweb, $vtopic );
@@ -508,37 +606,22 @@ sub _publishWeb {
           unless $count;
     }
 
-    my @templatesWanted = split( /[, ]+/, $this->{templates} );
-
-    foreach my $template (@templatesWanted) {
+    foreach my $template ( @{ $this->{templatesWanted} } ) {
         next unless $template;
         $this->{templatesReferenced}->{$template} = 1;
-        my $dir = "$Foswiki::cfg{PublishPlugin}{Dir}$this->{relativedir}"
-          . $this->_dirForTemplate($template);
-
-        File::Path::mkpath($dir);
-
-        $this->{archive} = $this->{generator}->new( $this, $dir, $this );
-
-        $this->publishUsingTemplate($template);
-
-        my $landed = $this->{archive}->close();
-
-        $this->logInfo( "Published To", <<LINK);
-<a href="$Foswiki::cfg{PublishPlugin}{URL}$this->{relativedir}$landed">$landed</a>
-LINK
-        Devel::Leak::Object::checkpoint() if CHECKLEAK;
+        $this->_publishUsingTemplate( $template, $web, $topics );
     }
 
     # check the templates referenced, and that everything referenced
     # has been generated.
     my @templatesReferenced = sort keys %{ $this->{templatesReferenced} };
-    @templatesWanted = sort @templatesWanted;
 
-    my @difference = arrayDiff( \@templatesReferenced, \@templatesWanted );
+    my @difference =
+      arrayDiff( \@templatesReferenced, $this->{templatesWanted} );
     if ( $#difference > 0 ) {
         $this->logInfo( "Templates Used", join( ",", @templatesReferenced ) );
-        $this->logInfo( "Templates Specified", join( ",", @templatesWanted ) );
+        $this->logInfo( "Templates Specified",
+            join( ",", @{ $this->{templatesWanted} } ) );
         $this->logWarn(<<BLAH);
 There is a difference between the templates you specified and what you
 needed. Consider changing the TEMPLATES setting so it has all Templates
@@ -553,7 +636,8 @@ sub _getPageTemplate {
     my ($this) = @_;
 
     my $query = Foswiki::Func::getCgiQuery();
-    my $topic = $query->param('publishtopic') || $this->{session}->{topicName};
+    my $web   = $Foswiki::cfg{SystemWebName};
+    my $topic = 'PublishPlugin';
     my $tmpl  = Foswiki::Func::readTemplate('view');
 
     $tmpl =~ s/%META\{.*?\}%//g;
@@ -561,16 +645,14 @@ sub _getPageTemplate {
         $tmpl =~ s/%$tag%//g;
     }
     my ( $header, $footer ) = split( /%TEXT%/, $tmpl );
-    $header =
-      Foswiki::Func::expandCommonVariables( $header, $topic, $this->{web} );
-    $header = Foswiki::Func::renderText( $header, $this->{web} );
+    $header = Foswiki::Func::expandCommonVariables( $header, $topic, $web );
+    $header = Foswiki::Func::renderText( $header, $web );
     $header =~ s/<nop>//go;
     Foswiki::Func::writeHeader();
     Foswiki::Plugins::PublishPlugin::_display $header;
 
-    $footer =
-      Foswiki::Func::expandCommonVariables( $footer, $topic, $this->{web} );
-    $footer = Foswiki::Func::renderText( $footer, $this->{web} );
+    $footer = Foswiki::Func::expandCommonVariables( $footer, $topic, $web );
+    $footer = Foswiki::Func::renderText( $footer, $web );
     return ( $header, $footer );
 }
 
@@ -619,61 +701,32 @@ sub logError {
 }
 
 #  Publish a set of topics using the given template (e.g. view)
-sub publishUsingTemplate {
-    my ( $this, $template ) = @_;
-
-    # Get list of topics
-    my @topics;
-
-    if ( $this->{topiclist} ) {
-        @topics = map {
-            my ( $w, $t ) =
-              Foswiki::Func::normalizeWebTopicName( $this->{web}, $_ );
-            "$w.$t"
-        } split( /[,\s]+/, $this->{topiclist} );
-    }
-    else {
-        @topics =
-          map { "$this->{web}.$_" } Foswiki::Func::getTopicList( $this->{web} );
-    }
+sub _publishUsingTemplate {
+    my ( $this, $template, $web, $topics ) = @_;
 
     # Choose template. Note that $template_TEMPLATE can still override
     # this in specific topics.
-    my $tmpl = Foswiki::Func::readTemplate( $template, $this->{publishskin} );
+    my $tmpl =
+      Foswiki::Func::readTemplate( $template, $this->{opt}->{publishskin} );
     die "Couldn't find template\n" if ( !$tmpl );
     my $filetype = _filetypeForTemplate($template);
 
     # Attempt to render each included page.
     my %copied;
-    foreach my $topic (@topics) {
+    foreach my $topic (@$topics) {
         next
-          if $this->{history}
-          && $topic eq $this->{history};    # never publish this
-        ( my $web, $topic ) =
-          Foswiki::Func::normalizeWebTopicName( $this->{web}, $topic );
+          if $this->{opt}->{history}
+          && $topic eq $this->{opt}->{history};    # never publish this
         try {
-            my $dispo = '';
-            if ( $this->{inclusions} && $topic !~ /^($this->{inclusions})$/ ) {
-                $dispo = 'not included';
-            }
-            elsif ($this->{exclusions}
-                && $topic =~ /^($this->{exclusions})$/ )
-            {
-                $dispo = 'excluded';
-            }
-            else {
-                my $rev =
-                  $this->publishTopic( $web, $topic, $filetype, $template,
-                    $tmpl, \%copied )
-                  || '0';
-                $dispo = "Rev $rev published";
-                $topic = '<a href="'
-                  . Foswiki::Func::getScriptUrl( $web, $topic, 'view',
-                    rev => $rev )
-                  . '">'
-                  . $topic . '</a>';
-            }
-            $this->logInfo( $topic, $dispo );
+            my $rev =
+              $this->publishTopic( $web, $topic, $filetype, $template,
+                $tmpl, \%copied )
+              || '0';
+            $topic =
+                '<a href="'
+              . Foswiki::Func::getScriptUrl( $web, $topic, 'view', rev => $rev )
+              . '">'
+              . $topic . '</a>';
         }
         catch Error::Simple with {
             my $e = shift;
@@ -716,6 +769,7 @@ sub publishTopic {
     my ( $this, $w, $t, $filetype, $template, $tmpl, $copied ) = @_;
 
     # Read topic data.
+    my ( $w, $t ) = Foswiki::Func::normalizeWebTopicName( $w, $t );
 
     my ( $meta, $text );
     my $publishedRev =
@@ -723,7 +777,8 @@ sub publishTopic {
       ? $this->{topicVersions}->{"$w.$t"}
       : undef;
 
-    my $topic = "$w.$t";
+    my $topic   = "$w.$t";
+    my $archive = $this->{archives}->{$template};
 
     ( $meta, $text ) = Foswiki::Func::readTopic( $w, $t, $publishedRev );
     unless ($publishedRev) {
@@ -734,7 +789,8 @@ sub publishTopic {
 
     unless (
         Foswiki::Func::checkAccessPermission(
-            "VIEW", $this->{publisher}, $text, $t, $w
+            "VIEW", Foswiki::Func::getWikiName(),
+            $text, $t, $w
         )
       )
     {
@@ -742,7 +798,7 @@ sub publishTopic {
         return;
     }
 
-    if ( $this->{topicsearch} && $text =~ /$this->{topicsearch}/ ) {
+    if ( $this->{opt}->{rexclude} && $text =~ /$this->{opt}->{rexclude}/ ) {
         $this->logInfo( $topic, "excluded by filter" );
         return;
     }
@@ -752,44 +808,33 @@ sub publishTopic {
     my $query = Foswiki::Func::getCgiQuery();
     $query->param( 'topic', $topic );
 
-    if ( defined &Foswiki::Func::pushTopicContext ) {
-
-        # In 1.0.6 and earlier, have to handle some session tags ourselves
-        # because pushTopicContext doesn't do it. **
-        if ( defined $Foswiki::Plugins::SESSION->{SESSION_TAGS} ) {
-            foreach my $macro (
-                qw(BASEWEB BASETOPIC
-                INCLUDINGWEB INCLUDINGTOPIC)
-              )
-            {
-                $old{$macro} = Foswiki::Func::getPreferencesValue($macro);
-            }
-        }
-        Foswiki::Func::pushTopicContext( $w, $t );
-        if ( defined $Foswiki::Plugins::SESSION->{SESSION_TAGS} ) {
-
-            # see ** above
-            my $stags = $Foswiki::Plugins::SESSION->{SESSION_TAGS};
-            $stags->{BASEWEB}        = $w;
-            $stags->{BASETOPIC}      = $t;
-            $stags->{INCLUDINGWEB}   = $w;
-            $stags->{INCLUDINGTOPIC} = $t;
-        }
-
-        # Remove disabled plugins from the context
-        foreach my $plugin ( keys( %{ $Foswiki::cfg{Plugins} } ) ) {
-            next unless ref( $Foswiki::cfg{Plugins}{$plugin} ) eq 'HASH';
-            my $enable = $Foswiki::cfg{Plugins}{$plugin}{Enabled};
-            Foswiki::Func::getContext()->{"${plugin}Enabled"} = $enable;
+    # In 1.0.6 and earlier, have to handle some session tags ourselves
+    # because pushTopicContext doesn't do it. **
+    if ( defined $Foswiki::Plugins::SESSION->{SESSION_TAGS} ) {
+        foreach my $macro (
+            qw(BASEWEB BASETOPIC
+            INCLUDINGWEB INCLUDINGTOPIC)
+          )
+        {
+            $old{$macro} = Foswiki::Func::getPreferencesValue($macro);
         }
     }
-    else {
+    Foswiki::Func::pushTopicContext( $w, $t );
+    if ( defined $Foswiki::Plugins::SESSION->{SESSION_TAGS} ) {
 
-        # Create a new session so that the contexts are correct. This is
-        # really, really inefficient, but is essential to maintain correct
-        # prefs if we don't have a modern Func
-        $old{SESSION} = $Foswiki::Plugins::SESSION;
-        $Foswiki::Plugins::SESSION = new Foswiki( $this->{publisher}, $query );
+        # see ** above
+        my $stags = $Foswiki::Plugins::SESSION->{SESSION_TAGS};
+        $stags->{BASEWEB}        = $w;
+        $stags->{BASETOPIC}      = $t;
+        $stags->{INCLUDINGWEB}   = $w;
+        $stags->{INCLUDINGTOPIC} = $t;
+    }
+
+    # Remove disabled plugins from the context
+    foreach my $plugin ( keys( %{ $Foswiki::cfg{Plugins} } ) ) {
+        next unless ref( $Foswiki::cfg{Plugins}{$plugin} ) eq 'HASH';
+        my $enable = $Foswiki::cfg{Plugins}{$plugin}{Enabled};
+        Foswiki::Func::getContext()->{"${plugin}Enabled"} = $enable;
     }
 
     # Because of Item5388, we have to re-read the topic to get the
@@ -806,7 +851,8 @@ sub publishTopic {
     my $override = Foswiki::Func::getPreferencesValue('VIEW_TEMPLATE');
     if ($override) {
         $tmpl =
-          Foswiki::Func::readTemplate( $override, $this->{publishskin}, $w );
+          Foswiki::Func::readTemplate( $override, $this->{opt}->{publishskin},
+            $w );
         $this->logInfo( $topic, "has a VIEW_TEMPLATE '$override'" );
     }
 
@@ -894,29 +940,34 @@ sub publishTopic {
     my $pub = Foswiki::Func::getPubUrlPath();
     $tmpl =~
       s!(['"\(])($Foswiki::cfg{DefaultUrlHost}|https?://$hs)?$pub/(.*?)(\1|\))!
-      $1.$this->_rsrcpath( $w ,$this->_copyResource($3, $copied) ).$4!ge;
+      $1.$this->_rsrcpath( $w ,$this->_copyResource($3, $archive, $copied), $archive ).$4!ge;
 
     my $ilt;
 
     # Modify local links to topics relative to server base
     $ilt =
-      $Foswiki::Plugins::SESSION->getScriptUrl( 0, 'view', 'NOISE', 'NOISE' );
+      $Foswiki::Plugins::SESSION->getScriptUrl( 0, 'NOISY', 'NOISE', 'NOISE' );
     $ilt =~ s!/NOISE/NOISE.*$!!;
+    $ilt =~ s!/NOISY!/[a-z.]+!;
     $tmpl =~
-      s!href=(["'])$ilt/(.*?)\1!"href=$1".$this->_topicURL($ilt, $2).$1!ge;
+s!href=(["'])$ilt/(.*?)\1!"href=$1".$this->_topicURL($ilt, $2, $w, $archive).$1!ge;
 
-    # Handle simple topic links (subwebs not handled)
+    # Handle simple topic links
     $tmpl =~
-s!href=(["'])([$Foswiki::regex{mixedAlphaNum}_]+([#?].*?)?)\1!"href=$1".$this->_topicURL($ilt, "$this->{web}/$2").$1!ge;
+s!href=(["'])([$Foswiki::regex{mixedAlphaNum}_]+([#?].*?)?)\1!"href=$1".$this->_topicURL($ilt, "$w/$2", $w, $archive).$1!ge;
 
     # Modify absolute topic links.
     $ilt =
       $Foswiki::Plugins::SESSION->getScriptUrl( 1, 'view', 'NOISE', 'NOISE' );
     $ilt =~ s!/NOISE/NOISE.*$!!;
+
     $tmpl =~
-      s!href=(["'])$ilt/(.*?)\1!"href=$1".$this->_topicURL($ilt, $2).$1!ge;
+s!href=(["'])$ilt/(.*?)\1!"href=$1".$this->_topicURL($ilt, $2, $w, $archive).$1!ge;
 
     # Modify topic-relative links
+
+    # Handle topic creation links
+    $tmpl =~ s!<a[^>]*class=(["'])foswikiNewLink\1[^>]*>(.*?)</a>!<a>$2</a>!g;
 
     # Modify topic-relative TOC links to strip out parameters (but not anchor)
     $tmpl =~ s!href=(["'])\?.*?(\1|#)!href=$1$2!g;
@@ -927,13 +978,13 @@ s!href=(["'])([$Foswiki::regex{mixedAlphaNum}_]+([#?].*?)?)\1!"href=$1".$this->_
 
     # Handle image tags using absolute URLs not otherwise satisfied
     $tmpl =~ s!(<img\s+.*?\bsrc=)(["'])(.*?)\2(.*?>)!
-      $1.$2.$this->_rsrcpath( $w, $this->_handleURL($3,\($this->{nextExternalResourceNumber})) ).$2.$4!ge;
+      $1.$2.$this->_rsrcpath( $w, $this->_handleURL($3,\($this->{nextExternalResourceNumber})), $archive ).$2.$4!ge;
 
     $tmpl =~ s/<nop>//g;
 
     # Write the resulting HTML.
     $w =~ s#\.#/#g;
-    $this->{archive}->addString( $tmpl, "$w/$t$filetype" );
+    $archive->addString( $tmpl, "$w/$t$filetype" );
 
     if ( defined &Foswiki::Func::popTopicContext ) {
         Foswiki::Func::popTopicContext();
@@ -955,6 +1006,8 @@ s!href=(["'])([$Foswiki::regex{mixedAlphaNum}_]+([#?].*?)?)\1!"href=$1".$this->_
     else {
         $Foswiki::Plugins::SESSION = $old{SESSION};    # restore session
     }
+
+    $this->logInfo( "$w.$t", "Rev $publishedRev published" );
 
     return $publishedRev;
 }
@@ -1006,11 +1059,11 @@ sub _filetypeForTemplate {
 
 #  Copy a resource (image, style sheet, etc.) from pub/%WEB% to
 #   static HTML's rsrc directory.
-#   * =$this->{web}= - name of web
-#   * =$rsrcName= - name of resource (relative to pub/%WEB%)
+#   * =$srcName= - name of resource (relative to pub/%WEB%)
+#   * =$archive= - archive object
 #   * =\%copied= - map of copied resources to new locations
 sub _copyResource {
-    my ( $this, $srcName, $copied ) = @_;
+    my ( $this, $srcName, $archive, $copied ) = @_;
 
     # srcName is a URL. Expand it.
     $srcName = Foswiki::urlDecode($srcName);
@@ -1021,15 +1074,11 @@ sub _copyResource {
     $rsrcName =~ /^\s*(.*?)\s*$/;
     $rsrcName = $1;
 
-    # SMELL WARNING (Martin Cleaver)
     # This is covers up a case such as where rsrcname comes through like
     # configtopic=PublishTestWeb/WebPreferences/favicon.ico
     # this should be just WebPreferences/favicon.ico
-    # I've searched for hours and so here's a workaround
     if ( $rsrcName =~ m/configtopic/ ) {
-        $this->logError("rsrcName '$rsrcName' contains literal 'configtopic'");
-        $rsrcName =~ s!.*?/(.*)!$this->{web}/$1!;
-        $this->logError("--- FIXED UP to $rsrcName");
+        die "rsrcName '$rsrcName' contains literal 'configtopic'";
     }
 
     # See if we've already copied this resource.
@@ -1053,15 +1102,15 @@ sub _copyResource {
         my $pubDir = Foswiki::Func::getPubDir();
         my $src    = "$pubDir/$bareRsrcName";
         if ( -r "$pubDir/$bareRsrcName" ) {
-            $this->{archive}->addDirectory( $this->{rsrcdir} );
-            $this->{archive}->addDirectory("$this->{rsrcdir}/$path");
-            my $dest = "$this->{rsrcdir}/$path/$file";
+            $archive->addDirectory( $this->{opt}->{rsrcdir} );
+            $archive->addDirectory("$this->{opt}->{rsrcdir}/$path");
+            my $dest = "$this->{opt}->{rsrcdir}/$path/$file";
             $dest =~ s!//!/!g;
             if ( -d $src ) {
-                $this->{archive}->addDirectory( $src, $dest );
+                $archive->addDirectory( $src, $dest );
             }
             else {
-                $this->{archive}->addFile( $src, $dest );
+                $archive->addFile( $src, $dest );
             }
 
             # Record copy so we don't duplicate it later.
@@ -1109,7 +1158,7 @@ sub _copyResource {
                                 $resource = $1;
                             }
                         }
-                        $this->_copyResource( $resource, $copied );
+                        $this->_copyResource( $resource, $archive, $copied );
                     }
                 }
             }
@@ -1125,7 +1174,7 @@ sub _copyResource {
 # $root - the root of the URL path, recognised as being a URL on the wiki
 # $path - the foswiki path to the topic from the URL
 sub _topicURL {
-    my ( $this, $root, $path ) = @_;
+    my ( $this, $root, $path, $web, $archive ) = @_;
     my $anchor = '';
     my $params = '';
 
@@ -1138,15 +1187,17 @@ sub _topicURL {
     }
 
     # Is this a path to a known topic? If not, reform the original URL
-    return "$root/$path$params$anchor" unless $this->{topics}->{$path};
+    # SMELL: don't do this, the URL matched something in this web, even
+    # if it's not there we need to map it, even though it's a broken link.
+    # return "$root/$path$params$anchor" unless $this->{topics}->{$path};
 
     # For here on we know we're dealing with a topic link, so we
     # ignore params in the rewritten URL - they won't be any use
     # when linking to static content.
 
     # See if the generator can deal with this topic
-    if ( $this->{archive}->can('mapTopicURL') ) {
-        my $gen = $this->{archive}->mapTopicURL( $path . $anchor );
+    if ( $archive && $archive->can('mapTopicURL') ) {
+        my $gen = $archive->mapTopicURL( $path . $anchor );
         return $gen if $gen;
     }
 
@@ -1155,7 +1206,7 @@ sub _topicURL {
     $path .= $Foswiki::cfg{HomeTopicName} if $path =~ /\/$/;
 
     # Normalise
-    my $web = join( '/', split( /[\/\.]+/, $this->{web} ) );
+    $web  = join( '/', split( /[\/\.]+/, $web ) );
     $path = join( '/', split( /[\/\.]+/, $path ) );
 
     # make a path relative to the web
@@ -1169,7 +1220,7 @@ sub _topicURL {
 sub _handleURL {
     my ( $this, $src, $extras ) = @_;
 
-    return $src unless $this->{copyexternal};
+    return $src unless $this->{opt}->{copyexternal};
 
     my $data;
     if ( defined(&Foswiki::Func::getExternalResource) ) {
@@ -1199,9 +1250,9 @@ sub _handleURL {
     # Note: no extension; rely on file format.
     # Images are pretty good that way.
     my $file = '___extra' . $$extras++;
-    $this->{archive}->addDirectory( $this->{rsrcdir} );
+    $this->{archive}->addDirectory( $this->{opt}->{rsrcdir} );
 
-    my $fpath = "$this->{rsrcdir}/$file";
+    my $fpath = "$this->{opt}->{rsrcdir}/$file";
     $this->{archive}->addString( $data, $fpath );
     return $fpath;
 }
@@ -1222,7 +1273,7 @@ sub _handleNewLink {
 # times; make sure that we only modify the path the first time.
 sub _rsrcpath {
 
-    my ( $this, $odir, $rsrcloc ) = @_;
+    my ( $this, $odir, $rsrcloc, $archive ) = @_;
 
     # if path is already relative or URLish, return it
     return $rsrcloc if $rsrcloc =~ m{^(\.+/|[a-z]+:)};
@@ -1231,8 +1282,8 @@ sub _rsrcpath {
 
     # See if the generator wants to deal with this resource
     my $nloc;
-    if ( $this->{archive}->can('mapResourceURL') ) {
-        $nloc = $this->{archive}->mapResourceURL( $odir, $rsrcloc );
+    if ( $archive && $archive->can('mapResourceURL') ) {
+        $nloc = $archive->mapResourceURL( $odir, $rsrcloc );
     }
 
     unless ($nloc) {

@@ -49,7 +49,13 @@ sub initPlugin {
         \&_PUBLISHERS_CONTROL_CENTRE );
     Foswiki::Func::registerTagHandler( 'PUBLISHING_GENERATORS',
         \&_PUBLISHING_GENERATORS );
-    return 1;                          # coupersetique
+
+    $Foswiki::cfg{PublishPlugin}{Dir} .= '/'
+      unless $Foswiki::cfg{PublishPlugin}{Dir} =~ m#/$#;
+    $Foswiki::cfg{PublishPlugin}{URL} .= '/'
+      unless $Foswiki::cfg{PublishPlugin}{URL} =~ m#/$#;
+
+    return 1;
 }
 
 sub _publishRESTHandler {
@@ -57,28 +63,21 @@ sub _publishRESTHandler {
     require Foswiki::Plugins::PublishPlugin::Publisher;
     die $@ if $@;
 
-    my $publisher = new Foswiki::Plugins::PublishPlugin::Publisher(
-        $Foswiki::Plugins::SESSION);
-
-    $Foswiki::cfg{PublishPlugin}{Dir} .= '/'
-      unless $Foswiki::cfg{PublishPlugin}{Dir} =~ m#/$#;
-    $Foswiki::cfg{PublishPlugin}{URL} .= '/'
-      unless $Foswiki::cfg{PublishPlugin}{URL} =~ m#/$#;
-
     my $query = Foswiki::Func::getCgiQuery();
-    if ( defined $query->param('control') ) {
 
-        # Control UI
-        $publisher->control($query);
+    # 'compress' undocumented but retained for compatibility
+    if ( $query && defined $query->param('compress') ) {
+        my $v = $query->param('compress');
+        if ( $v =~ /(\w+)/ ) {
+            $query->param( 'format', $1 );
+        }
     }
-    else {
-        my $webs = $query->param('web')
-          || $Foswiki::Plugins::SESSION->{webName};
-        $query->delete('web');
-        $webs =~ m#([\w/.,\s]*)#;    # clean up and untaint
 
-        $publisher->publish( split( /[,\s]+/, $1 ) );
-    }
+    my $publisher = new Foswiki::Plugins::PublishPlugin::Publisher(
+        sub { return $query->param( $_[0] ) },
+        $Foswiki::Plugins::SESSION );
+
+    $publisher->publish();
     $publisher->finish();
 }
 
