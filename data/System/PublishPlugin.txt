@@ -338,10 +338,10 @@ ISBN=1-56592-149-6
   <tr>
     <td class="nameCol">Publishing history topic</td>
     <td class="inputCol">
-      <input type="text" name="history" class="foswikiInputField" size="30" value="PublishPluginHistory" />
+      <input type="text" name="history" class="foswikiInputField" size="30" value="" />
     </td>
     <td class="infoCol">
-      This is where the history of your publishing is stored. Each time you publish, this topic is re-written with the log of the publishing process. You have to have "change" access to this topic. You can specify a topic in another web using the standard Web.Topic syntax.
+      This is where the history of your publishing is stored. Specify a topic name. Each time you publish, this topic is re-written with the log of the publishing process. You have to have "change" access to this topic. You can specify a topic in another web using the standard Web.Topic syntax, or leave this blank if you don't need a history.
     </td>
     <td class="paramCol">
       =history=

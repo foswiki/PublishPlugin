@@ -26,8 +26,8 @@ my %parameters = (
     exclusions    => { default   => '', validator => \&_wildcard2RE },
     format        => { default   => 'file', validator => \&_validateWord },
     history => {
-        default   => 'PublishPluginHistory',
-        validator => \&_validateTopicName
+        default   => '',
+        validator => \&_validateTopicNameOrNull
     },
     inclusions  => { default => '.*', validator => \&_wildcard2RE },
     preferences => { default => '' },
@@ -99,6 +99,11 @@ sub _validateTopicNameList {
         push( @ts, _validateTopicName( $t, $k ) );
     }
     return join( ',', @ts );
+}
+
+sub _validateTopicNameOrNull {
+    return _validateTopicName( $_[0] ) if $_[0];
+    return $_[0];
 }
 
 sub _validateTopicName {
@@ -185,7 +190,8 @@ sub new {
 
     # Try and build the generator first, so we can pull in param defs
     $data->{format} ||= 'file';
-    die "Bad format" unless $data->{format} =~ /^(\w+)$/;
+    die "Bad output format '$data->{format}'"
+      unless $data->{format} =~ /^(\w+)$/;
     $this->{generator} = 'Foswiki::Plugins::PublishPlugin::BackEnd::' . $1;
     eval 'use ' . $this->{generator};
 
@@ -375,24 +381,6 @@ sub publish {
 
     my $firstWeb = $webs[0];
 
-    my ( $hw, $ht ) =
-      Foswiki::Func::normalizeWebTopicName( $firstWeb, $this->{history} );
-    unless (
-        Foswiki::Func::checkAccessPermission(
-            'CHANGE', Foswiki::Func::getWikiName(),
-            undef, $ht, $hw
-        )
-      )
-    {
-        $this->logError( <<TEXT, $footer );
-Can't publish because $this->{publisher} can't CHANGE
-$hw.$ht.
-This topic must be editable by the user doing the publishing.
-TEXT
-        return;
-    }
-    $this->{history} = "$hw.$ht";
-
     # Force static context for all published topics
     Foswiki::Func::getContext()->{static} = 1;
 
@@ -421,39 +409,61 @@ TEXT
         $this->_publishWeb($web);
     }
 
-    my ( $meta, $text ) = Foswiki::Func::readTopic( $hw, $ht );
-    my $history =
-      Foswiki::Func::loadTemplate( 'publish_history', $this->{publishskin} );
+    if ( $this->{history} ) {
 
-    # See if we have history template. Unfortunately for compatibility
-    # reasons, Func::readTemplate doesn't distinguish between no template
-    # and an empty template :-(
-    if ($history) {
+        my ( $hw, $ht ) =
+          Foswiki::Func::normalizeWebTopicName( $firstWeb, $this->{history} );
+        unless (
+            Foswiki::Func::checkAccessPermission(
+                'CHANGE', Foswiki::Func::getWikiName(),
+                undef, $ht, $hw
+            )
+          )
+        {
+            $this->logError( <<TEXT, $footer );
+            Can't publish because $this->{publisher} can't CHANGE
+$hw.$ht.
+This topic must be editable by the user doing the publishing.
+TEXT
+            return;
+        }
+        $this->{history} = "$hw.$ht";
 
-        # Expand macros *before* we include the history text so we pick up
-        # session preferences.
-        Foswiki::Func::setPreferencesValue( 'PUBLISHING_HISTORY',
-            $this->{historyText} );
-        $history = Foswiki::Func::expandCommonVariables($history);
-    }
-    elsif ( Foswiki::Func::topicExists( $hw, $ht ) ) {
+        my ( $meta, $text ) = Foswiki::Func::readTopic( $hw, $ht );
+        my $history =
+          Foswiki::Func::loadTemplate( 'publish_history',
+            $this->{publishskin} );
 
-        # No template, use the last publish run (legacy)
-        $text ||= '';
-        $text =~ s/(^|\n)---\+ Last Published\n.*$//s;
-        $history =
+        # See if we have history template. Unfortunately for compatibility
+        # reasons, Func::readTemplate doesn't distinguish between no template
+        # and an empty template :-(
+        if ($history) {
+
+            # Expand macros *before* we include the history text so we pick up
+            # session preferences.
+            Foswiki::Func::setPreferencesValue( 'PUBLISHING_HISTORY',
+                $this->{historyText} );
+            $history = Foswiki::Func::expandCommonVariables($history);
+        }
+        elsif ( Foswiki::Func::topicExists( $hw, $ht ) ) {
+
+            # No template, use the last publish run (legacy)
+            $text ||= '';
+            $text =~ s/(^|\n)---\+ Last Published\n.*$//s;
+            $history =
 "$text---+ Last Published\n<noautolink>\n$this->{historyText}\n</noautolink>";
-    }
-    else {
+        }
+        else {
 
-        # No last run, make something up
-        $history =
+            # No last run, make something up
+            $history =
 "---+ Last Published\n<noautolink>\n$this->{historyText}\n</noautolink>";
+        }
+        Foswiki::Func::saveTopic( $hw, $ht, $meta, $history,
+            { minor => 1, forcenewrevision => 1 } );
+        my $url = Foswiki::Func::getScriptUrl( $hw, $ht, 'view' );
+        $this->logInfo( "History saved in", "<a href='$url'>$url</a>" );
     }
-    Foswiki::Func::saveTopic( $hw, $ht, $meta, $history,
-        { minor => 1, forcenewrevision => 1 } );
-    my $url = Foswiki::Func::getScriptUrl( $hw, $ht, 'view' );
-    $this->logInfo( "History saved in", "<a href='$url'>$url</a>" );
 
     Foswiki::Plugins::PublishPlugin::_display($footer);
 }
@@ -546,7 +556,7 @@ sub _getPageTemplate {
     my $topic = $query->param('publishtopic') || $this->{session}->{topicName};
     my $tmpl  = Foswiki::Func::readTemplate('view');
 
-    $tmpl =~ s/%META{.*?}%//g;
+    $tmpl =~ s/%META\{.*?\}%//g;
     for my $tag (qw( REVTITLE REVARG REVISIONS MAXREV CURRREV )) {
         $tmpl =~ s/%$tag%//g;
     }
@@ -636,7 +646,9 @@ sub publishUsingTemplate {
     # Attempt to render each included page.
     my %copied;
     foreach my $topic (@topics) {
-        next if $topic eq $this->{history};    # never publish this
+        next
+          if $this->{history}
+          && $topic eq $this->{history};    # never publish this
         ( my $web, $topic ) =
           Foswiki::Func::normalizeWebTopicName( $this->{web}, $topic );
         try {
