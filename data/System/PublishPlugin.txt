@@ -699,6 +699,15 @@ take precautions to prevent accidental leakage of confidential information
 by restricting web access to this directory, for example in the Apache
 configuration.
 
+One way to do this is to use the =viewfile= access rights management to control
+access to the published content:
+   * Create a hidden web named e.g. Publish
+   * Make this web public readable (via Publish.WebPreferences; ALLOW/DENYTOPICVIEW)
+   * Create a topic Publish.PublishedContent
+   * Change !PublishPlugin Settings in =configure= to publish to =pub/Publish/PublishedContent=
+Access controles on =Publish= web and =!Publish.PublishedContent= will then
+apply.
+
 ---++ Dependencies
 
 %$DEPENDENCIES%
