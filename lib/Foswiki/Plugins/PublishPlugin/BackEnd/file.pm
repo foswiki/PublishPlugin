@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2005 Crawford Currie, http://c-dot.co.uk
+# Copyright (C) 2005-2017 Crawford Currie, http://c-dot.co.uk
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -12,7 +12,9 @@
 # GNU General Public License for more details, published at
 # http://www.gnu.org/copyleft/gpl.html
 #
-# File writer module for PublishPlugin
+# File writer module for PublishPlugin. This is the reference
+# implementation of BackEnd - it implements the directory structure
+# described therein.
 #
 package Foswiki::Plugins::PublishPlugin::BackEnd::file;
 
@@ -28,8 +30,22 @@ use constant DESCRIPTION =>
 "A directory tree on the server containing a single HTML file for each topic and copies of all published attachments.";
 
 sub new {
-    my $class = shift;
-    my $this  = $class->SUPER::new(@_);
+    my ( $class, $params, $logger ) = @_;
+
+    my $this = $class->SUPER::new( $params, $logger );
+
+    $this->{file_root} =
+      $this->pathJoin( $this->{file_root}, $params->{relativedir} )
+      if $params->{relativedir};
+    $this->{file_root} =
+      $this->pathJoin( $this->{file_root}, $params->{outfile} )
+      if $params->{outfile};
+
+    $this->{url_root} =
+      $this->pathJoin( $this->{url_root}, $params->{relativeurl} )
+      if $params->{relativeurl};
+    $this->{url_root} = $this->pathJoin( $this->{url_root}, $params->{outfile} )
+      if $params->{outfile};
 
     my $oldmask = umask(
         oct(777) - (
@@ -37,24 +53,26 @@ sub new {
               || $Foswiki::cfg{Store}{dirPermission}
         )
     );
-    $this->{params}->{outfile} ||= 'file';
 
-    if ( -e "$this->{path}/$this->{params}->{outfile}" ) {
-        File::Path::rmtree("$this->{path}/$this->{params}->{outfile}");
-    }
-    eval { File::Path::mkpath( $this->{path} ); };
+    eval { File::Path::mkpath( $this->{file_root} ); };
     umask($oldmask);
     die $@ if $@;
 
-    push( @{ $this->{files} }, 'index.html' );
+    $this->{rsrc_path} = ( $params->{rsrcdir} || 'rsrc' );
+    $this->{resource_id} = 0;
+
+    # Capture HTML generated for use by subclasses
+    $this->{html_generated} = [];
 
     return $this;
 }
 
 sub param_schema {
     my $class = shift;
+
     return {
-        outfile => {
+        relativeurl => { default => '/' },
+        outfile     => {
             default => 'file',
             validator =>
               \&Foswiki::Plugins::PublishPlugin::Publisher::validateFilename
@@ -78,83 +96,115 @@ sub addDirectory {
               || $Foswiki::cfg{Store}{dirPermission}
         )
     );
-    eval { File::Path::mkpath("$this->{path}$this->{params}->{outfile}/$name") };
+    eval { File::Path::make_path("$this->{file_root}$name") };
     $this->{logger}->logError($@) if $@;
     umask($oldmask);
     push( @{ $this->{dirs} }, $name );
 }
 
-sub addString {
-    my ( $this, $string, $file ) = @_;
+sub getTopicPath {
+    my ( $this, $web, $topic ) = @_;
+    my @path = split( /\/+/, $web );
+    push( @path,, $topic . '.html' );
+    return $this->pathJoin(@path);
+}
+
+sub addTopic {
+    my ( $this, $web, $topic, $text ) = @_;
+
+    my @path = grep { length($_) } split( /\/+/, $web );
+
+    File::Path::mkpath( $this->pathJoin( $this->{file_root}, @path ) );
+    push( @path, $topic . '.html' );
+
+    my $file = $this->pathJoin( $this->{file_root}, @path );
 
     my $fh;
-    my $d = $file;
-    if ( $d =~ m#(.*)/[^/]*$# ) {
-        File::Path::mkpath("$this->{path}$this->{params}->{outfile}/$1");
-    }
-    if ( open( $fh, '>', "$this->{path}$this->{params}->{outfile}/$file" ) ) {
+
+    if ( open( $fh, '>', $file ) ) {
         binmode($fh);
-        print $fh $string;
+        print $fh $text;
         close($fh);
-        push( @{ $this->{files} }, $file )
-          unless ( grep { /^$file$/ } @{ $this->{files} } );
     }
     else {
         $this->{logger}->logError("Cannot write $file: $!");
     }
 
-    if ( $file =~ m#([^/\.]*)\.html?$# ) {
-        my $topic = $1;
-        push( @{ $this->{urls} }, $file );
+    push( @{ $this->{html_generated} }, $file );
 
-        unless ( $topic eq 'default' || $topic eq 'index' ) {
+    my $url = $this->pathJoin(@path);
+    push( @{ $this->{urls} }, $url );
 
-            # write link from index.html to actual topic
-            my $link = "<a href='$file'>$file</a><br>";
-            $this->_catString( $link, 'default.htm' );
-            $this->_catString( $link, 'index.html' );
-            $this->{logger}->logInfo( $topic, '(default.htm, index.html)' );
-        }
-    }
+    $this->{logger}->logInfo($topic);
+
+    return $url;
 }
 
-sub _catString {
-    my ( $this, $string, $file ) = @_;
+sub addAttachment {
+    my ( $this, $web, $topic, $attachment, $data ) = @_;
 
-    my $data;
+    my @path = split( /\/+/, $web );
+    push( @path, $topic . '.attachments' );
+
+    File::Path::mkpath( $this->pathJoin( $this->{file_root}, @path ) );
+    push( @path, $attachment );
+
+    my $file = $this->pathJoin( $this->{file_root}, @path );
     my $fh;
-    if ( open( $fh, '<', "$this->{path}$this->{params}->{outfile}/$file" ) ) {
-        local $/ = undef;
-        $data = <$fh> . "\n" . $string;
+    if ( open( $fh, '>', $file ) ) {
+        print $fh $data;
         close($fh);
     }
     else {
-        $data = $string;
+        $this->{logger}->logError("Failed to write $file: $!");
     }
-    $this->addString( $data, $file );
+    return $this->pathJoin(@path);
 }
 
-sub addFile {
-    my ( $this, $from, $to ) = @_;
-    my $dest = "$this->{path}$this->{params}->{outfile}/$to";
-    File::Copy::copy( $from, $dest )
-      or $this->{logger}->logError("Cannot copy $from to $dest: $!");
-    my @stat = stat($from);
-    $this->{logger}->logError("Unable to stat $from") unless @stat;
-    utime( @stat[ 8, 9 ], $dest );
-    die if $to =~ /index.html/;
-    push( @{ $this->{files} }, $to );
+sub addResource {
+    my ( $this, $data, $ext ) = @_;
+    $ext //= '';
+    my $path = $this->{rsrc_path};
+    File::Path::mkpath($path);
+
+    while ( -e "$this->{file_root}/$path/rsrc$this->{resource_id}$ext" ) {
+        $this->{resource_id}++;
+    }
+    $path = "$path/rsrc$this->{resource_id}$ext";
+
+    my $fh;
+    if ( open( $fh, '>', "$this->{file_root}/$path" ) ) {
+        print $fh $data;
+        close($fh);
+    }
+    else {
+        $this->{logger}
+          ->logError("Failed to write $this->{file_root}/$path: $!");
+    }
+    return $path;
+}
+
+# Abstracted for subclasses to override
+sub addRootFile {
+    my ( $this, $file, $data ) = @_;
+    my $fh;
+    unless ( open( $fh, ">", "$this->{file_root}/$file" ) ) {
+        $this->{logger}->logError("Failed to write $file:  $!");
+        return;
+    }
+    print $fh $data;
+    close($fh);
+    $this->{logger}->logInfo( '', 'Published ' . $file );
+    return $file;
 }
 
 sub close {
     my $this = shift;
 
     # write sitemap.xml
-    my $sitemap = $this->_createSitemap( \@{ $this->{urls} } );
-    $this->addString( $sitemap, 'sitemap.xml' );
-    $this->{logger}->logInfo( '', 'Published sitemap.xml' );
+    $this->addRootFile( 'sitemap.xml', $this->_createSitemap() );
 
-    # write google verification files (comma seperated list)
+    # write google verification files (comma separated list)
     if ( $this->{params}->{googlefile} ) {
         my @files = split( /[,\s]+/, $this->{params}->{googlefile} );
         for my $file (@files) {
@@ -162,38 +212,26 @@ sub close {
                 '<html><title>'
               . $file
               . '</title><body>just for google</body></html>';
-            $this->addString( $simplehtml, $file );
-            $this->{logger}->logInfo( '', 'Published googlefile : ' . $file );
+            $this->addRootFile( $file, $simplehtml );
         }
     }
 
-    return $this->{params}->{outfile};
+    # Write default.htm and index.html
+    my $links =
+      join( '</br>', map { "<a href='$_'>$_</a>" } @{ $this->{urls} } );
+    $this->addRootFile( 'default.htm', $links );
+    $this->addRootFile( 'index.html',  $links );
+    return $this->{url_root};
 }
 
 sub _createSitemap {
-    my $this     = shift;
-    my $filesRef = shift;       #( \@{$this->{files}} )
-    my $map      = << 'HERE';
-<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.google.com/schemas/sitemap/0.84">
-%URLS%
-</urlset>
-HERE
-
-    my $topicTemplatePre  = "<url>\n<loc>";
-    my $topicTemplatePost = "</loc>\n</url>";
-
-    my $urls = join(
-        "\n",
-        map {
-                "$topicTemplatePre$this->{params}->{relativeurl}"
-              . "$_$topicTemplatePost\n"
-        } @$filesRef
-    );
-
-    $map =~ s/%URLS%/$urls/;
-
-    return $map;
+    my $this = shift;
+    return
+        '<?xml version="1.0" encoding="UTF-8"?>'
+      . '<urlset xmlns="http://www.google.com/schemas/sitemap/0.84">'
+      . join( "\n",
+        map { '<url><loc>' . $_ . '</loc></url>'; } @{ $this->{urls} } )
+      . '</urlset>';
 }
 
 1;

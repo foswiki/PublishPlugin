@@ -20,13 +20,4 @@ $Foswiki::cfg{Plugins>{PublishPlugin}{URL} = '$Foswiki::cfg{DefaultUrlHost}$Fosw
 # <li>%EXTRAS|U% will expand to any additional generator options entered
 # in the publishing form.</li></ul>
 $Foswiki::cfg{Plugins}{PublishPlugin}{PDFCmd} = 'htmldoc --webpage --links --linkstyle plain --outfile %FILE|F% %EXTRAS|U% %FILES|F%';
-# **BOOLEAN EXPERT**
-# May be enabled to prevent slowdown and unnecessary memory use if templates are 
-# frequently reloaded, for some 1.1.x versions of Foswiki.
-# This is NOT a likely condition, and it is only known to manifest
-# when there are additional problems in the data being published.
-# However, if there is something wrong in the publishing configuration,
-# then it is possible for many pages to have at least one inline alert,
-# and Foswiki::inlineAlert reloads its template each time it is called
-# (at least, it does for some versions of Foswiki).
-$Foswiki::cfg{Plugins}{PublishPlugin}{PurgeTemplates} = 0;
+

@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2005 Crawford Currie, http://c-dot.co.uk
+# Copyright (C) 2005-2017 Crawford Currie, http://c-dot.co.uk
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,8 +18,8 @@ package Foswiki::Plugins::PublishPlugin::BackEnd::zip;
 
 use strict;
 
-use Foswiki::Plugins::PublishPlugin::BackEnd;
-our @ISA = ('Foswiki::Plugins::PublishPlugin::BackEnd');
+use Foswiki::Plugins::PublishPlugin::BackEnd::file;
+our @ISA = ('Foswiki::Plugins::PublishPlugin::BackEnd::file');
 
 use constant DESCRIPTION =>
   'HTML compressed into a single zip file for shipping.';
@@ -28,57 +28,79 @@ use Foswiki::Func;
 use File::Path;
 
 sub new {
-    my $class = shift;
-    my ($params) = @_;
-    $params->{outfile} ||= "zip";
-    my $this = $class->SUPER::new(@_);
+    my ( $class, $params, $logger ) = @_;
 
     eval 'use Archive::Zip qw( :ERROR_CODES :CONSTANTS )';
     die $@ if $@;
-    $this->{zip} = Archive::Zip->new();
+
+    my $pf = ( $params->{outfile} || 'zip' );
+    $params->{outfile} = '';
+    my $this = $class->SUPER::new( $params, $logger );
+
+    $this->{zipfile} = $pf;
+    $this->{zipfile} .= '.zip' unless $this->{zipfile} =~ /\.\w+$/;
+    $this->{zip}         = Archive::Zip->new();
+    $this->{rsrc_path}   = ( $params->{rsrcdir} || 'rsrc' );
+    $this->{resource_id} = 0;
 
     return $this;
 }
 
 sub param_schema {
     my $class = shift;
-    return {
-        outfile => {
-            default => 'zip',
-            validator =>
-              \&Foswiki::Plugins::PublishPlugin::Publisher::validateFilename
-        },
-        %{ $class->SUPER::param_schema() }
-    };
+    my $base  = $class->SUPER::param_schema();
+    $base->{outfile}->{default} = 'zip';
+    return $base;
 }
 
-sub addDirectory {
-    my ( $this, $dir ) = @_;
-    $this->{logger}->logError("Error adding $dir")
-      unless $this->{zip}->addDirectory($dir);
+sub addTopic {
+    my ( $this, $web, $topic, $text ) = @_;
+    my $path = "$web/$topic.html";
+    $this->{logger}->logError("Error adding $web.$topic")
+      unless $this->{zip}->addString( $text, $path );
+    return $path;
 }
 
-sub addString {
-    my ( $this, $string, $file ) = @_;
-    $this->{logger}->logError("Error adding $string")
-      unless $this->{zip}->addString( $string, $file );
+sub getTopicPath {
+    my ( $this, $web, $topic ) = @_;
+    return "$web/$topic.html";
 }
 
-sub addFile {
-    my ( $this, $from, $to ) = @_;
-    $this->{logger}->logError("Error adding $from")
-      unless $this->{zip}->addFile( $from, $to );
+sub addAttachment {
+    my ( $this, $web, $topic, $att, $data ) = @_;
+    my $pth = "$web/$topic.attachments/$att";
+    $this->{logger}->logError("Error adding $pth")
+      unless $this->{zip}->addString( $data, $pth );
+    return $pth;
+}
+
+sub addResource {
+    my ( $this, $data, $ext ) = @_;
+    my $path = $this->{rsrc_path};
+    $this->{resource_id}++;
+    $ext //= '';
+    $path = "$path/rsrc$this->{resource_id}$ext";
+    $this->{logger}->logError("Error adding $path")
+      unless $this->{zip}->addString( $data, $path );
+    return $path;
+}
+
+sub addRootFile {
+    my ( $this, $file, $data ) = @_;
+    $this->{logger}->logError("Error adding $file")
+      unless $this->{zip}->addString( $data, $file );
+    return $file;
 }
 
 sub close {
     my $this = shift;
-    my $dir  = $this->{path};
-    eval { File::Path::mkpath($dir) };
-    $this->{logger}->logError($@) if $@;
-    my $landed = "$this->{params}->{outfile}.zip";
-    $this->{logger}->logError("Error writing $landed")
-      if $this->{zip}->writeToFileNamed("$this->{path}$landed");
-    return $landed;
+
+    my $end = $this->pathJoin( $this->{file_root}, $this->{zipfile} );
+    my $u = $this->SUPER::close();
+
+    $this->{logger}->logError("Error writing $end")
+      if $this->{zip}->writeToFileNamed($end);
+    return $u . '/' . $this->{zipfile};
 }
 
 1;

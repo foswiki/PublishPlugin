@@ -18,25 +18,32 @@ our $SHORTDESCRIPTION =
 'Generate static output (HTML, PDF) optionally upload (FTP) the output to a publishing site.';
 
 sub initPlugin {
-    unless ( defined $Foswiki::cfg{PublishPlugin}{Dir} ) {
+
+    # Compatibility
+    $Foswiki::cfg{Plugins}{PublishPlugin}{Dir} //=
+      $Foswiki::cfg{PublishPlugin}{Dir};
+    $Foswiki::cfg{Plugins}{PublishPlugin}{URL} //=
+      $Foswiki::cfg{PublishPlugin}{URL};
+
+    unless ( defined $Foswiki::cfg{Plugins}{PublishPlugin}{Dir} ) {
         die
-"Can't publish because {PublishPlugin}{Dir} was not set. Please notify your Wiki administrator";
+"Can't publish because {Plugins}{PublishPlugin}{Dir} was not set. Please notify your Wiki administrator";
     }
-    unless ( $Foswiki::cfg{PublishPlugin}{URL} ) {
+    unless ( $Foswiki::cfg{Plugins}{PublishPlugin}{URL} ) {
         die
-"Can't publish because {PublishPlugin}{URL} was not set. Please notify your Wiki administrator";
+"Can't publish because {Plugins}{PublishPlugin}{URL} was not set. Please notify your Wiki administrator";
     }
-    if (   !-d $Foswiki::cfg{PublishPlugin}{Dir}
-        && !-e $Foswiki::cfg{PublishPlugin}{Dir} )
+    if (   !-d $Foswiki::cfg{Plugins}{PublishPlugin}{Dir}
+        && !-e $Foswiki::cfg{Plugins}{PublishPlugin}{Dir} )
     {
-        mkdir( $Foswiki::cfg{PublishPlugin}{Dir}, 0777 )
+        mkdir( $Foswiki::cfg{Plugins}{PublishPlugin}{Dir}, 0777 )
           || die "Cannot mkdir {PublishPlugin}{Dir}";
     }
-    unless ( -d $Foswiki::cfg{PublishPlugin}{Dir}
-        && -w $Foswiki::cfg{PublishPlugin}{Dir} )
+    unless ( -d $Foswiki::cfg{Plugins}{PublishPlugin}{Dir}
+        && -w $Foswiki::cfg{Plugins}{PublishPlugin}{Dir} )
     {
         die
-"Can't publish because no useable {PublishPlugin}{Dir} was found. Please notify your Wiki administrator";
+"Can't publish because no useable {Plugins}{PublishPlugin}{Dir} was found. Please notify your Wiki administrator";
     }
 
     Foswiki::Func::registerRESTHandler(
@@ -49,11 +56,6 @@ sub initPlugin {
         \&_PUBLISHERS_CONTROL_CENTRE );
     Foswiki::Func::registerTagHandler( 'PUBLISHING_GENERATORS',
         \&_PUBLISHING_GENERATORS );
-
-    $Foswiki::cfg{PublishPlugin}{Dir} .= '/'
-      unless $Foswiki::cfg{PublishPlugin}{Dir} =~ m#/$#;
-    $Foswiki::cfg{PublishPlugin}{URL} .= '/'
-      unless $Foswiki::cfg{PublishPlugin}{URL} =~ m#/$#;
 
     return 1;
 }
@@ -94,12 +96,12 @@ sub _display {
         }
 
         # Strip HTML tags from command-line output
-        $msg =~ s/<[a-z]+[^>]*>/ /g;
+        $msg =~ s/<\/?[a-z]+[^>]*>/ /g;
         print "$msg\n";
     }
 }
 
-# Allow manipulation of $Foswiki::cfg{PublishPlugin}{Dir}
+# Allow manipulation of $Foswiki::cfg{Plugins}{PublishPlugin}{Dir}
 sub _PUBLISHING_GENERATORS {
     my ( $session, $params, $topic, $web, $topicObject ) = @_;
 
@@ -139,7 +141,7 @@ sub _PUBLISHING_GENERATORS {
     return Foswiki::Func::decodeFormatTokens( join( $separator, @list ) );
 }
 
-# Allow manipulation of $Foswiki::cfg{PublishPlugin}{Dir}
+# Allow manipulation of $Foswiki::cfg{Plugins}{PublishPlugin}{Dir}
 sub _PUBLISHERS_CONTROL_CENTRE {
     my ( $session, $params, $topic, $web, $topicObject ) = @_;
 
@@ -168,20 +170,20 @@ HERE
 
     if ( $action eq 'delete' ) {
         $file =~ m#([\w./\\]+)#;    # untaint
-        if ( -e "$Foswiki::cfg{PublishPlugin}{Dir}/$1" ) {
-            File::Path::rmtree("$Foswiki::cfg{PublishPlugin}{Dir}/$1");
+        if ( -e "$Foswiki::cfg{Plugins}{PublishPlugin}{Dir}/$1" ) {
+            File::Path::rmtree("$Foswiki::cfg{Plugins}{PublishPlugin}{Dir}/$1");
             $output .= CGI::p("$1 deleted");
         }
         else {
             $output .= CGI::p("Cannot delete $1 - no such file");
         }
     }
-    if ( opendir( D, $Foswiki::cfg{PublishPlugin}{Dir} ) ) {
+    if ( opendir( D, $Foswiki::cfg{Plugins}{PublishPlugin}{Dir} ) ) {
         my @files = sort grep( !/^\./, readdir(D) );
         if ( scalar(@files) ) {
             $output .= CGI::start_table();
             foreach $file (@files) {
-                my $link = "$Foswiki::cfg{PublishPlugin}{URL}/$file";
+                my $link = "$Foswiki::cfg{Plugins}{PublishPlugin}{URL}/$file";
                 $link = CGI::a( { href => $link }, $file );
                 my @cols   = ( CGI::th($link) );
                 my $delcol = CGI::start_form(
@@ -214,7 +216,8 @@ HERE
         }
     }
     else {
-        $output .= "Failed to open '$Foswiki::cfg{PublishPlugin}{Dir}': $!";
+        $output .=
+          "Failed to open '$Foswiki::cfg{Plugins}{PublishPlugin}{Dir}': $!";
     }
 
     return $output;

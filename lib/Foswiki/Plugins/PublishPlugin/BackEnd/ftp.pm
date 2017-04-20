@@ -1,4 +1,4 @@
-# Copyright (C) 2005-2009 Crawford Currie, http://c-dot.co.uk
+# Copyright (C) 2005-2017 Crawford Currie, http://c-dot.co.uk
 # Copyright (C) 2006 Martin Cleaver, http://www.cleaver.org
 #
 # This program is free software; you can redistribute it and/or
@@ -23,8 +23,8 @@ package Foswiki::Plugins::PublishPlugin::BackEnd::ftp;
 
 use strict;
 
-# Inherit from file backend; we use the local copy as the cache for
-# uploading from
+# Inherit from file backend, but only to get the benefit of index
+# file generation
 use Foswiki::Plugins::PublishPlugin::BackEnd::file;
 our @ISA = ('Foswiki::Plugins::PublishPlugin::BackEnd::file');
 
@@ -35,8 +35,9 @@ use File::Temp qw(:seekable);
 use File::Spec;
 
 sub new {
-    my $class = shift;
-    my $this  = $class->SUPER::new(@_);
+    my ( $class, $params, $logger ) = @_;
+
+    my $this = $class->SUPER::new( $params, $logger );
 
     $this->{params}->{fastupload} ||= 0;
     if ( $this->{params}->{destinationftpserver} ) {
@@ -51,7 +52,6 @@ sub new {
 
         $this->{logger}->logInfo( '', "fastUpload = $this->{fastupload}" );
     }
-
     return $this;
 }
 
@@ -67,26 +67,54 @@ sub param_schema {
     };
 }
 
-sub addString {
-    my ( $this, $string, $file ) = @_;
+sub addTopic {
+    my ( $this, $web, $topic, $text ) = @_;
 
-    $this->SUPER::addString( $string, $file );
-    $this->_upload($file);
+    my $u = $this->SUPER::getTopicPath( $web, $topic );
+    $this->_upload( $text, $u );
+    return $u;
 }
 
-sub addFile {
-    my ( $this, $from, $to ) = @_;
-    $this->SUPER::addFile( $from, $to );
+sub addAttachment {
+    my ( $this, $web, $topic, $attachment, $data ) = @_;
+    my $u = $this->pathJoin( $web, $topic . '.attachments', $attachment );
+    $this->_upload( $data, $u );
+    return $u;
+}
 
-    $this->_upload($to);
+sub addResource {
+    my ( $this, $data, $ext ) = @_;
+    $ext //= '';
+    my $path = $this->{rsrc_path};
+    $this->{resource_id}++;
+    $path = "$path/rsrc$this->{resource_id}$ext";
+    $this->_upload( $data, $path );
+    return $path;
+}
+
+sub addRootFile {
+    my ( $this, $file, $data ) = @_;
+    $this->_upload( $data, $file );
+    return $file;
 }
 
 sub _upload {
-    my ( $this, $to ) = @_;
+    my ( $this, $data, $to ) = @_;
 
-    return unless ( $this->{params}->{destinationftpserver} );
+    unless ( $this->{params}->{destinationftpserver} ) {
+        $this->{logger}
+          ->logInfo("Would upload to $to, but there's no FTP server specified");
+        return;
+    }
 
-    my $localfilePath = "$this->{path}/$to";
+    my $localFilePath = "$Foswiki::cfg{TempfileDir}/pub$$";
+    my $fh;
+    unless ( open( $fh, '>', $localFilePath ) ) {
+        $this->{logger}->logError( '', "Failed to upload $to: $!" );
+        return;
+    }
+    print $fh $data;
+    close($fh);
 
     my $attempts = 0;
     my $ftp;
@@ -102,9 +130,9 @@ sub _upload {
 
                 # Calculate checksum for local file
                 my $fh;
-                open( $fh, '<', $localfilePath )
+                open( $fh, '<', $localFilePath )
                   or die
-                  "Failed to open $localfilePath for checksum computation: $!";
+                  "Failed to open $localFilePath for checksum computation: $!";
                 local $/;
                 binmode($fh);
                 my $data = <$fh>;
@@ -133,18 +161,18 @@ sub _upload {
                 }
                 else {
                     my $fh;
-                    open( $fh, '>', "$localfilePath.md5" )
-                      or die "Failed to open $localfilePath.md5 for write: $!";
+                    open( $fh, '>', "$localFilePath.md5" )
+                      or die "Failed to open $localFilePath.md5 for write: $!";
                     binmode($fh);
                     print $fh $localCS;
                     close($fh);
 
-                    $ftp->put( "$localfilePath.md5", "$to.md5" )
+                    $ftp->put( "$localFilePath.md5", "$to.md5" )
                       or die "put failed ", $ftp->message;
                 }
             }
 
-            $ftp->put( $localfilePath, $to )
+            $ftp->put( $localFilePath, $to )
               or die "put failed ", $ftp->message;
             $this->{logger}->logInfo( "FTPed",
                 "$to to $this->{params}->{destinationftpserver}" );

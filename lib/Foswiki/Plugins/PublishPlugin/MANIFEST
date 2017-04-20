@@ -8,7 +8,6 @@ lib/Foswiki/Plugins/PublishPlugin/PageAssembler.pm 0444
 lib/Foswiki/Plugins/PublishPlugin/BackEnd.pm 0444
 lib/Foswiki/Plugins/PublishPlugin/BackEnd/file.pm 0444
 lib/Foswiki/Plugins/PublishPlugin/BackEnd/flatfile.pm 0444
-lib/Foswiki/Plugins/PublishPlugin/BackEnd/flatpdf.pm 0444
 lib/Foswiki/Plugins/PublishPlugin/BackEnd/ftp.pm 0444
 lib/Foswiki/Plugins/PublishPlugin/BackEnd/pdf.pm 0444
 lib/Foswiki/Plugins/PublishPlugin/BackEnd/tgz.pm 0444
