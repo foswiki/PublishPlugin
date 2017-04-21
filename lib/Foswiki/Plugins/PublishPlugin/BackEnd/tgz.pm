@@ -31,17 +31,18 @@ use Assert;
 sub new {
     my ( $class, $params, $logger ) = @_;
 
-    my $pf = ( $params->{outfile} || 'tgz' );
-    $params->{outfile} = '';
+    $params->{dont_scan_existing} = 1;
+
     my $this = $class->SUPER::new( $params, $logger );
-
     require Archive::Tar;
+    $this->{tgz} = Archive::Tar->new();
 
-    $this->{tgzfile} = $pf;
-    $this->{tgzfile} .= '.tgz' unless $this->{tgzfile} =~ /\.\w+$/;
-    $this->{tgz}         = Archive::Tar->new();
-    $this->{rsrc_path}   = ( $params->{rsrcdir} || 'rsrc' );
-    $this->{resource_id} = 0;
+    $this->{tgz_path} = $this->{output_file};    # from superclass
+    $this->{tgz_path} .= '.tgz' unless $this->{tgz_path} =~ /\.\w+$/;
+    $this->{tgz_file} =
+      $this->pathJoin( $Foswiki::cfg{Plugins}{PublishPlugin}{Dir},
+        $this->{tgz_path} );
+    $this->addPath( $this->{tgz_file}, 1 );
 
     return $this;
 }
@@ -53,55 +54,23 @@ sub param_schema {
     return $base;
 }
 
-sub addTopic {
-    my ( $this, $web, $topic, $text ) = @_;
-    my $path = "$web/$topic.html";
-    $this->{logger}
-      ->logError( "Error adding $web.$topic: " . $this->{tgz}->error() )
-      unless $this->{tgz}->add_data( $path, $text );
-    return $path;
-}
-
-sub getTopicPath {
-    my ( $this, $web, $topic ) = @_;
-    return "$web/$topic.html";
-}
-
-sub addAttachment {
-    my ( $this, $web, $topic, $att, $data ) = @_;
-    my $pth = "$web/$topic.attachments/$att";
-    $this->{logger}->logError( "Error adding $pth: " . $this->{tgz}->error() )
-      unless $this->{tgz}->add_data( $pth, $data );
-    return $pth;
-}
-
-sub addRootFile {
+sub addByteData {
     my ( $this, $file, $data ) = @_;
     $this->{logger}->logError( "Error adding $file: " . $this->{tgz}->error() )
-      unless $this->{tgz}->add_data( $file, $data );
+      unless $this->{tgz}->add_data( Encode::encode_utf8($file), $data );
     return $file;
-}
-
-sub addResource {
-    my ( $this, $data, $ext ) = @_;
-    my $path = $this->{rsrc_path};
-    $this->{resource_id}++;
-    $ext //= '';
-    $path = "$path/rsrc$this->{resource_id}$ext";
-    $this->{logger}->logError( "Error adding $path: " . $this->{tgz}->error() )
-      unless $this->{tgz}->add_data( $path, $data );
-    return $path;
 }
 
 sub close {
     my $this = shift;
-    my $u    = $this->SUPER::close();
-    my $end  = $this->pathJoin( $this->{file_root}, $this->{tgzfile} );
 
-    unless ( $this->{tgz}->write( $end, 1 ) ) {
+    # SUPER::close to get index files
+    $this->SUPER::close();
+
+    unless ( $this->{tgz}->write( $this->{tgz_file}, 1 ) ) {
         $this->{logger}->logError( $this->{tgz}->error() );
     }
-    return $u . '/' . $this->{tgzfile};
+    return $this->{tgz_path};
 }
 
 1;

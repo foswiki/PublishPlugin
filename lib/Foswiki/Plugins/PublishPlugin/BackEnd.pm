@@ -24,24 +24,12 @@ All archives are interfaced to by adding topics, attachments, and
 storing the data at a unique url that can be used in topics to
 link to that resource.
 
-For example, a backend could be implemented using a directory structure
-to reflect the hierarchical web structure of the wiki. Topics might be stored
-by writing HTML files to paths relative to the root of this
-structure. Thus, the topic =System.Web<nop>Home= would be stored to
-=/System/WebHome.html=.  Attachments to topics are stored in a special
-'.attachments' subdirectory next to the =.html= file, so attachment
-'System.Web<nop>Home:example.gif' will be stored to
-=/System/WebHome.attachments/example.gif=.
-
-The special top-level directory '_external' could be reserved for storing
-external resources (those referenced from topics and downloaded)
-
-Broken links may be generated if the target topic is not included in
-the list of topics to publish.
-
 =cut
 
 package Foswiki::Plugins::PublishPlugin::BackEnd;
+
+use strict;
+use Assert;
 
 =begin TML
 
@@ -57,22 +45,17 @@ Construct a new back end.
 sub new {
     my ( $class, $params, $logger ) = @_;
 
-    $Foswiki::cfg{Plugins}{PublishPlugin}{Dir};
-    $Foswiki::cfg{Plugins}{PublishPlugin}{URL};
-
     my $this = bless(
         {
-            file_root => $Foswiki::cfg{Plugins}{PublishPlugin}{Dir},
-            url_root  => $Foswiki::cfg{Plugins}{PublishPlugin}{URL},
-            params    => $params || {},
-            logger    => $logger
+            params => $params || {},
+            logger => $logger
         },
         $class
     );
     return $this;
 }
 
-# Like join, but for dir and url paths
+# Like join, but for dir and url paths, for subclasses
 sub pathJoin {
     my $this = shift;
     my $all = join( '/', grep { length($_) } @_ );
@@ -90,7 +73,34 @@ Get schema of query parameters, in the same format as Publisher.pm
 =cut
 
 sub param_schema {
-    return {};
+    ASSERT( 0, "Pure virtual method requires implementation" );
+}
+
+=begin TML
+
+---++ ClassMethod describeParams($template, $sep) -> $string
+Expand the given template to generate a string description. Expanded
+tokens are: $pname, $phelp, $pdefault
+
+=cut
+
+sub describeParams {
+    my ( $this, $template, $sep ) = @_;
+    my $ps   = $this->param_schema();
+    my $desc = '';
+    $sep //= '';
+    my @entries;
+    my $entry;
+    foreach my $p ( sort keys %$ps ) {
+        my $spec = $ps->{$p};
+        $entry = $template;
+        $entry =~ s/\$pname/$p/g;
+        $entry =~ s/\$phelp/$spec->{desc} || ''/ge;
+        my $def = $spec->{default} // '';
+        $entry =~ s/\$pdefault/$def/g;
+        push( @entries, $entry );
+    }
+    return join( $sep, @entries );
 }
 
 =begin TML
@@ -166,8 +176,6 @@ Errors should be logged to the logger.
 =cut
 
 sub close {
-    my $this = shift;
-    return $this->{url_root};
 }
 
 1;

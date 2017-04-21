@@ -12,9 +12,9 @@
 # GNU General Public License for more details, published at
 # http://www.gnu.org/copyleft/gpl.html
 #
-# File writer module for PublishPlugin. This is the reference
-# implementation of BackEnd - it implements the directory structure
-# described therein.
+# File writer module for PublishPlugin. Generates a file structure
+# suitable for dropping in as a web wite, complete with optional
+# index and google verification file
 #
 package Foswiki::Plugins::PublishPlugin::BackEnd::file;
 
@@ -25,83 +25,82 @@ our @ISA = ('Foswiki::Plugins::PublishPlugin::BackEnd');
 
 use File::Copy ();
 use File::Path ();
-
+use Foswiki::Plugins::PublishPlugin::Publisher
+  qw(validateFilename validateRelPath);
 use constant DESCRIPTION =>
-"A directory tree on the server containing a single HTML file for each topic and copies of all published attachments.";
+"Generates a directory tree on the server containing an HTML file for each topic, and copies of all published attachments. If you have selected =copyexternal=, then copied resources will be stored in a top level =_rsrc= directory. %X% since April 2017 publishing is _incremental_ - it will not delete existing content. You need to do that yourself if you want to. Be careful that moved topics and attachments may end up remaining in published content if you don't.";
 
 sub new {
     my ( $class, $params, $logger ) = @_;
 
     my $this = $class->SUPER::new( $params, $logger );
 
-    $this->{file_root} =
-      $this->pathJoin( $this->{file_root}, $params->{relativedir} )
-      if $params->{relativedir};
-    $this->{file_root} =
-      $this->pathJoin( $this->{file_root}, $params->{outfile} )
+    $this->{output_file} = $params->{relativedir} || '';
+    $this->{output_file} =
+      $this->pathJoin( $this->{output_file}, $params->{outfile} )
       if $params->{outfile};
 
-    $this->{url_root} =
-      $this->pathJoin( $this->{url_root}, $params->{relativeurl} )
-      if $params->{relativeurl};
-    $this->{url_root} = $this->pathJoin( $this->{url_root}, $params->{outfile} )
-      if $params->{outfile};
+    $this->{file_root} =
+      $this->pathJoin( $Foswiki::cfg{Plugins}{PublishPlugin}{Dir},
+        $this->{output_file} );
 
-    my $oldmask = umask(
-        oct(777) - (
-                 $Foswiki::cfg{RCS}{dirPermission}
-              || $Foswiki::cfg{Store}{dirPermission}
-        )
-    );
-
-    eval { File::Path::mkpath( $this->{file_root} ); };
-    umask($oldmask);
-    die $@ if $@;
-
-    $this->{rsrc_path} = ( $params->{rsrcdir} || 'rsrc' );
     $this->{resource_id} = 0;
 
     # Capture HTML generated for use by subclasses
-    $this->{html_generated} = [];
+    $this->{html_files} = {};
+
+    unless ( $params->{dont_scan_existing} ) {
+        $this->_scanExistingHTML( $this->{file_root}, '' );
+    }
 
     return $this;
 }
 
+# Find existing HTML in published dir structure to add to sitemap etc
+sub _scanExistingHTML {
+    my ( $this, $root, $relpath ) = @_;
+
+    my $d;
+    return unless ( opendir( $d, "$root/$relpath" ) );
+    while ( my $f = readdir($d) ) {
+        next if $f =~ /^\./;
+        if ( -d "$root$relpath/$f" ) {
+            $this->_scanExistingHTML( $root, $relpath ? "$relpath/$f" : $f );
+        }
+        elsif ( $relpath && $f =~ /\.html$/ ) {
+            $this->{html_files}->{ Encode::decode_utf8("$relpath/$f") } = 2;
+        }
+    }
+    closedir($d);
+}
+
+# Implement  Foswiki::Plugins::PublishPlugin::BackEnd
 sub param_schema {
     my $class = shift;
 
     return {
-        relativeurl => { default => '/' },
-        outfile     => {
-            default => 'file',
-            validator =>
-              \&Foswiki::Plugins::PublishPlugin::Publisher::validateFilename
+        outfile => {
+            desc =>
+'Filename at the root of your generated output. If you leave this blank, the name of the format will be used',
+            default   => 'file',
+            validator => \&validateFilename
         },
         googlefile => {
-            default => '',
-            validator =>
-              \&Foswiki::Plugins::PublishPlugin::Publisher::validateFilenameList
+            desc =>
+'Google HTML verification file name (see https://sites.google.com/site/webmasterhelpforum/en/verification-specifics)',
+            default   => '',
+            validator => \&validateFilename
         },
-        defaultpage => { default => 'WebHome' },
-        %{ $class->SUPER::param_schema }
+        relativedir => {
+            desc =>
+'Additional path components to put above the top of the published output. See [[%SYSTEMWEB%.PublishPlugin#PublishToTopic][here]] for one way this can be used.',
+            default   => '',
+            validator => \&validateRelPath,
+        }
     };
 }
 
-sub addDirectory {
-    my ( $this, $name ) = @_;
-
-    my $oldmask = umask(
-        oct(777) - (
-                 $Foswiki::cfg{RCS}{dirPermission}
-              || $Foswiki::cfg{Store}{dirPermission}
-        )
-    );
-    eval { File::Path::make_path("$this->{file_root}$name") };
-    $this->{logger}->logError($@) if $@;
-    umask($oldmask);
-    push( @{ $this->{dirs} }, $name );
-}
-
+# Implement Foswiki::Plugins::PublishPlugin::BackEnd
 sub getTopicPath {
     my ( $this, $web, $topic ) = @_;
     my @path = split( /\/+/, $web );
@@ -109,87 +108,66 @@ sub getTopicPath {
     return $this->pathJoin(@path);
 }
 
+# Implement  Foswiki::Plugins::PublishPlugin::BackEnd
 sub addTopic {
     my ( $this, $web, $topic, $text ) = @_;
 
     my @path = grep { length($_) } split( /\/+/, $web );
-
-    File::Path::mkpath( $this->pathJoin( $this->{file_root}, @path ) );
     push( @path, $topic . '.html' );
 
-    my $file = $this->pathJoin( $this->{file_root}, @path );
-
-    my $fh;
-
-    if ( open( $fh, '>', $file ) ) {
-        binmode($fh);
-        print $fh $text;
-        close($fh);
-    }
-    else {
-        $this->{logger}->logError("Cannot write $file: $!");
-    }
-
-    push( @{ $this->{html_generated} }, $file );
-
-    my $url = $this->pathJoin(@path);
-    push( @{ $this->{urls} }, $url );
-
-    $this->{logger}->logInfo($topic);
-
-    return $url;
+    my $path = $this->pathJoin(@path);
+    $this->{html_files}->{$path} = 1;
+    return $this->addByteData( $path, Encode::encode_utf8($text) );
 }
 
+# Implement Foswiki::Plugins::PublishPlugin::BackEnd
 sub addAttachment {
     my ( $this, $web, $topic, $attachment, $data ) = @_;
 
-    my @path = split( /\/+/, $web );
+    my @path = grep { length($_) } split( /\/+/, $web );
     push( @path, $topic . '.attachments' );
-
-    File::Path::mkpath( $this->pathJoin( $this->{file_root}, @path ) );
     push( @path, $attachment );
 
-    my $file = $this->pathJoin( $this->{file_root}, @path );
-    my $fh;
-    if ( open( $fh, '>', $file ) ) {
-        print $fh $data;
-        close($fh);
-    }
-    else {
-        $this->{logger}->logError("Failed to write $file: $!");
-    }
-    return $this->pathJoin(@path);
+    my $path = $this->pathJoin(@path);
+    return $this->addByteData( $path, $data );
 }
 
+# Implement Foswiki::Plugins::PublishPlugin::BackEnd
 sub addResource {
-    my ( $this, $data, $ext ) = @_;
-    $ext //= '';
-    my $path = $this->{rsrc_path};
+    my ( $this, $data, $name ) = @_;
+    my $prefix = '';
+    my $ext    = '';
+    if ( $ext =~ /(.*)(\.\w+)$/ ) {
+        $prefix = $1 // '';
+        $ext = $2;
+    }
+    $this->{resource_id}++;
+    my $path = "_rsrc/$prefix$this->{resource_id}$ext";
+    return $this->addByteData( $path, $data );
+}
+
+# Add a path to a directory - abstracted to allow subclasses to override
+sub addPath {
+    my ( $this, $path, $is_file ) = @_;
+
+    if ($is_file) {
+        my @p = split( '/', $path );
+        pop(@p);
+        $path = join( '/', @p );
+    }
     File::Path::mkpath($path);
-
-    while ( -e "$this->{file_root}/$path/rsrc$this->{resource_id}$ext" ) {
-        $this->{resource_id}++;
-    }
-    $path = "$path/rsrc$this->{resource_id}$ext";
-
-    my $fh;
-    if ( open( $fh, '>', "$this->{file_root}/$path" ) ) {
-        print $fh $data;
-        close($fh);
-    }
-    else {
-        $this->{logger}
-          ->logError("Failed to write $this->{file_root}/$path: $!");
-    }
-    return $path;
 }
 
 # Abstracted for subclasses to override
-sub addRootFile {
+# Both $file and $data must be byte data - long characters will
+# break many engines.
+sub addByteData {
     my ( $this, $file, $data ) = @_;
+    my $fn = "$this->{file_root}/$file";
+    $this->addPath( $fn, 1 );
     my $fh;
-    unless ( open( $fh, ">", "$this->{file_root}/$file" ) ) {
-        $this->{logger}->logError("Failed to write $file:  $!");
+    unless ( open( $fh, ">", $fn ) ) {
+        $this->{logger}->logError("Failed to write $fn:  $!");
         return;
     }
     print $fh $data;
@@ -198,40 +176,55 @@ sub addRootFile {
     return $file;
 }
 
+# Implement Foswiki::Plugins::PublishPlugin::BackEnd
 sub close {
     my $this = shift;
 
-    # write sitemap.xml
-    $this->addRootFile( 'sitemap.xml', $this->_createSitemap() );
+    while ( my ( $k, $v ) = each %{ $this->{html_files} } ) {
+        next if $v < 2;
+        $this->{logger}->logInfo( '', 'Adding previously published ' . $k );
+    }
 
-    # write google verification files (comma separated list)
+    # write sitemap.xml
+    my $sitemap =
+        '<?xml version="1.0" encoding="UTF-8"?>'
+      . '<urlset xmlns="http://www.google.com/schemas/sitemap/0.84">'
+      . join( "\n",
+        map { '<url><loc>' . $_ . '</loc></url>'; }
+          keys %{ $this->{html_files} } )
+      . '</urlset>';
+    $this->addByteData( 'sitemap.xml', Encode::encode_utf8($sitemap) );
+
+    # Write Google verification files (comma separated list)
     if ( $this->{params}->{googlefile} ) {
-        my @files = split( /[,\s]+/, $this->{params}->{googlefile} );
+        my @files = split( /\s*,\s*/, $this->{params}->{googlefile} );
         for my $file (@files) {
             my $simplehtml =
                 '<html><title>'
               . $file
-              . '</title><body>just for google</body></html>';
-            $this->addRootFile( $file, $simplehtml );
+              . '</title><body>Google verification</body></html>';
+            $this->addByteData( $file, Encode::encode_utf8($simplehtml) );
         }
     }
 
     # Write default.htm and index.html
-    my $links =
-      join( '</br>', map { "<a href='$_'>$_</a>" } @{ $this->{urls} } );
-    $this->addRootFile( 'default.htm', $links );
-    $this->addRootFile( 'index.html',  $links );
-    return $this->{url_root};
-}
+    my $links = <<'HEAD';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+</head>
+<body>
+HEAD
+    $links .= join( "</br>\n",
+        map { "<a href='$_'>$_</a>" }
+        sort keys %{ $this->{html_files} } );
+    $links .= "\n</body>";
+    $links = Encode::encode_utf8($links);
+    $this->addByteData( 'default.htm', $links );
+    $this->addByteData( 'index.html',  $links );
 
-sub _createSitemap {
-    my $this = shift;
-    return
-        '<?xml version="1.0" encoding="UTF-8"?>'
-      . '<urlset xmlns="http://www.google.com/schemas/sitemap/0.84">'
-      . join( "\n",
-        map { '<url><loc>' . $_ . '</loc></url>'; } @{ $this->{urls} } )
-      . '</urlset>';
+    return $this->{output_file};
 }
 
 1;

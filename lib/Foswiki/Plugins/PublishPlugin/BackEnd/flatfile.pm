@@ -19,26 +19,28 @@ package Foswiki::Plugins::PublishPlugin::BackEnd::flatfile;
 use strict;
 
 use Foswiki::Plugins::PublishPlugin::BackEnd::file;
-our @ISA = ('Foswiki::Plugins::PublishPlugin::BackEnd::file');
+our @ISA = ('Foswiki::Plugins::PublishPlugin::BackEnd');
 
 use constant DESCRIPTION =>
-'Single HTML file containing all topics. Attachments will be saved to a resource directory on the server.';
+'Single HTML file containing all topics. Attachments (and external resources if =copyexternal is selected=) will be saved to a top level =_rsrc= directory next to the HTML file.';
 
 sub new {
     my ( $class, $params, $logger ) = @_;
+
+    $params->{dont_scan_existing} = 1;
     my $this = $class->SUPER::new( $params, $logger );
 
     $this->{flatfile} = ( $params->{outfile} || 'flatfile' );
     $this->{flatfile} .= '.html' unless $this->{flatfile} =~ /\.\w+$/;
 
+    my $fn = "$Foswiki::cfg{Plugins}{PublishPlugin}{Dir}/$this->{flatfile}";
     my $fh;
-    if ( open( $fh, '>', "$this->{file_root}/$this->{flatfile}" ) ) {
+    if ( open( $fh, '>', $fn ) ) {
         binmode($fh);
-        $this->{flatfile} = $fh;
+        $this->{flatfh} = $fh;
     }
     else {
-        $this->{logger}
-          ->logError("Cannot write $this->{file_root}/$this->{flatfile}: $!");
+        $this->{logger}->logError("Cannot write $fn: $!");
     }
     return $this;
 }
@@ -61,17 +63,26 @@ sub addTopic {
 
     # Topics can be added inline to master with an anchor
     my $anchor = _makeAnchor( $web, $topic );
-    my $fh = $this->{flatfile};
+    my $fh = $this->{flatfh};
     print $fh "<a name='$anchor'></a>";
     print $fh $text;
     return '#' . $anchor;
+}
+
+sub addAttachment {
+
+    # Default is to store attachments in a .attachments dir next to
+    # the topic. That won't work for flatfile, as the topics are all
+    # in one file, so whack them into the resource dir instead.
+    my ( $this, $web, $topic, $attachment, $data ) = @_;
+    return $this->addResource( $data, $attachment );
 }
 
 sub close {
     my $this = shift;
 
     close( $this->{flatfile} ) if $this->{flatfile};
-    return $this->SUPER::close() . '/' . $this->{flatfile};
+    return $this->{flatfile};
 }
 
 1;

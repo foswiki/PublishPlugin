@@ -21,8 +21,7 @@ use strict;
 use Foswiki::Plugins::PublishPlugin::BackEnd::file;
 our @ISA = ('Foswiki::Plugins::PublishPlugin::BackEnd::file');
 
-use constant DESCRIPTION =>
-'PDF file with all content in it. Each topic will start on a new page in the PDF.';
+use constant DESCRIPTION => 'PDF file with all content in it';
 
 use File::Path;
 
@@ -32,68 +31,71 @@ sub new {
     die "{Plugins}{PublishPlugin}{PDFCmd} not defined"
       unless $Foswiki::cfg{Plugins}{PublishPlugin}{PDFCmd};
 
-    # We will generate using the 'file' generator first, then pack it
-    my $save = {
-        outfile => $params->{outfile} || 'pdf',
-        relativedir => $params->{relativedir},
-        relativeurl => $params->{relativeurl}
-    };
-    $params->{outfile} = "pdf_temp";
-    undef $params->{relativedir};
-    undef $params->{relativeurl};
-
     $Foswiki::cfg{Plugins}{PublishPlugin}{PDFCmd} //=
       $Foswiki::cfg{PublishPlugin}{PDFCmd};
 
+    $params->{dont_scan_existing} = 1;
+
     my $this = $class->SUPER::new( $params, $logger );
-    $this->{save} = $save;
+
+    $this->{tempdir} = File::Temp::tempdir( CLEANUP => 1 );
+
+    $this->{pdf_path} = $this->{output_file};    # from superclass
+    $this->{pdf_path} .= '.pdf' unless $this->{pdf_path} =~ /\.\w+$/;
+    $this->{pdf_file} =
+      $this->pathJoin( $Foswiki::cfg{Plugins}{PublishPlugin}{Dir},
+        $this->{pdf_path} );
+    $this->addPath( $this->{pdf_file}, 1 );
+
     return $this;
 }
 
+# Override Foswiki::Plugins::PublishPlugin::BackEnd::file
 sub param_schema {
     my $class = shift;
     my $base  = $class->SUPER::param_schema();
     $base->{outfile}->{default} = 'pdf';
+    delete $base->{googlefile};
     return $base;
 }
 
-sub addRootFile {
-
-    # None needed for pdf
+# Override Foswiki::Plugins::PublishPlugin::BackEnd::file
+sub addByteData {
+    my ( $this, $path, $data ) = @_;
+    my $file = join( '_', split( '/', $path ) );
+    my $fn = "$this->{tempdir}/$file";
+    my $fh;
+    unless ( open( $fh, '>', $fn ) ) {
+        $this->{logger}->logError("Failed to write $file:  $!");
+        return;
+    }
+    print $fh $data;
+    close($fh);
+    $this->{html_files}->{$fn} = 1 if $path =~ /\.html/;
+    return $path;
 }
 
+# Override Foswiki::Plugins::PublishPlugin::BackEnd::file
 sub close {
     my $this = shift;
-
-    my @pdf_path = ();
-    push( @pdf_path, $this->{save}->{relativedir} )
-      if defined $this->{save}->{relativedir};
-    push( @pdf_path, $this->{save}->{outfile} || 'pdf' );
-
-    my $pdf_path = $this->pathJoin( grep { length($_) } @pdf_path );
-    $pdf_path .= '.pdf' unless $pdf_path =~ /\.\w+$/;
-    my $pdf_file =
-      $this->pathJoin( $Foswiki::cfg{Plugins}{PublishPlugin}{Dir}, $pdf_path );
 
     $ENV{HTMLDOC_DEBUG} = 1;    # see man htmldoc - goes to apache err log
     $ENV{HTMLDOC_NOCGI} = 1;    # see man htmldoc
 
+    my @files = keys %{ $this->{html_files} };
+
     my ( $data, $exit ) = Foswiki::Sandbox::sysCommand(
         undef,
         $Foswiki::cfg{Plugins}{PublishPlugin}{PDFCmd},
-        FILE   => $pdf_file,
-        FILES  => $this->{html_generated},
+        FILE   => $this->{pdf_file},
+        FILES  => \@files,
         EXTRAS => []
     );
 
     # htmldoc fails a lot, so log rather than dying
     $this->{logger}->logError("htmldoc failed: $exit/$data/$@") if $exit;
 
-    # Get rid of the temporaries
-    File::Path::rmtree( $this->{file_root} );
-
-    return $this->pathJoin( $Foswiki::cfg{Plugins}{PublishPlugin}{URL},
-        $pdf_path );
+    return $this->{pdf_path};
 }
 
 1;

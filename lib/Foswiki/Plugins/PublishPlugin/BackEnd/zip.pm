@@ -33,15 +33,17 @@ sub new {
     eval 'use Archive::Zip qw( :ERROR_CODES :CONSTANTS )';
     die $@ if $@;
 
-    my $pf = ( $params->{outfile} || 'zip' );
-    $params->{outfile} = '';
+    $params->{dont_scan_existing} = 1;
     my $this = $class->SUPER::new( $params, $logger );
 
-    $this->{zipfile} = $pf;
-    $this->{zipfile} .= '.zip' unless $this->{zipfile} =~ /\.\w+$/;
-    $this->{zip}         = Archive::Zip->new();
-    $this->{rsrc_path}   = ( $params->{rsrcdir} || 'rsrc' );
-    $this->{resource_id} = 0;
+    $this->{zip} = Archive::Zip->new();
+
+    $this->{zip_path} = $this->{output_file};    # from superclass
+    $this->{zip_path} .= '.zip' unless $this->{zip_path} =~ /\.\w+$/;
+    $this->{zip_file} =
+      $this->pathJoin( $Foswiki::cfg{Plugins}{PublishPlugin}{Dir},
+        $this->{zip_path} );
+    $this->addPath( $this->{zip_file}, 1 );
 
     return $this;
 }
@@ -53,54 +55,23 @@ sub param_schema {
     return $base;
 }
 
-sub addTopic {
-    my ( $this, $web, $topic, $text ) = @_;
-    my $path = "$web/$topic.html";
-    $this->{logger}->logError("Error adding $web.$topic")
-      unless $this->{zip}->addString( $text, $path );
-    return $path;
-}
-
-sub getTopicPath {
-    my ( $this, $web, $topic ) = @_;
-    return "$web/$topic.html";
-}
-
-sub addAttachment {
-    my ( $this, $web, $topic, $att, $data ) = @_;
-    my $pth = "$web/$topic.attachments/$att";
-    $this->{logger}->logError("Error adding $pth")
-      unless $this->{zip}->addString( $data, $pth );
-    return $pth;
-}
-
-sub addResource {
-    my ( $this, $data, $ext ) = @_;
-    my $path = $this->{rsrc_path};
-    $this->{resource_id}++;
-    $ext //= '';
-    $path = "$path/rsrc$this->{resource_id}$ext";
-    $this->{logger}->logError("Error adding $path")
-      unless $this->{zip}->addString( $data, $path );
-    return $path;
-}
-
-sub addRootFile {
+sub addByteData {
     my ( $this, $file, $data ) = @_;
     $this->{logger}->logError("Error adding $file")
-      unless $this->{zip}->addString( $data, $file );
+      unless $this->{zip}->addString( $data, Encode::encode_utf8($file) );
     return $file;
 }
 
 sub close {
     my $this = shift;
 
-    my $end = $this->pathJoin( $this->{file_root}, $this->{zipfile} );
-    my $u = $this->SUPER::close();
+    # SUPER::close to get index files
+    $this->SUPER::close();
 
-    $this->{logger}->logError("Error writing $end")
-      if $this->{zip}->writeToFileNamed($end);
-    return $u . '/' . $this->{zipfile};
+    if ( $this->{zip}->writeToFileNamed( $this->{zip_file} ) ) {
+        $this->{logger}->logError("Error writing $this->{zip_file}");
+    }
+    return $this->{zip_path};
 }
 
 1;

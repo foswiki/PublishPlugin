@@ -12,8 +12,8 @@ use Foswiki::Func ();
 use Error qw( :try );
 use Assert;
 
-our $VERSION = '2.50';
-our $RELEASE = '25 Jan 2017';
+our $VERSION = '3.0';
+our $RELEASE = '21 Apr 2017';
 our $SHORTDESCRIPTION =
 'Generate static output (HTML, PDF) optionally upload (FTP) the output to a publishing site.';
 
@@ -76,10 +76,9 @@ sub _publishRESTHandler {
     }
 
     my $publisher = new Foswiki::Plugins::PublishPlugin::Publisher(
-        sub { return $query->param( $_[0] ) },
-        $Foswiki::Plugins::SESSION );
+        $Foswiki::Plugins::SESSION);
 
-    $publisher->publish();
+    $publisher->publish( sub { return $query->param( $_[0] ) } );
     $publisher->finish();
 }
 
@@ -97,7 +96,14 @@ sub _display {
 
         # Strip HTML tags from command-line output
         $msg =~ s/<\/?[a-z]+[^>]*>/ /g;
-        print "$msg\n";
+        $msg =~ s/&nbsp;/ /g;
+        eval {
+            require HTML::Entities;
+
+            # decode entities
+            $msg = HTML::Entities::decode_entities($msg);
+        };
+        print Encode::encode_utf8($msg) . "\n";
     }
 }
 
@@ -106,38 +112,42 @@ sub _PUBLISHING_GENERATORS {
     my ( $session, $params, $topic, $web, $topicObject ) = @_;
 
     my $format = defined $params->{format} ? $params->{format} : '$item';
-    my $separator = defined $params->{separator} ? $params->{separator} : ',';
+    my $separator = defined $params->{separator} ? $params->{separator} : '';
 
     # Get a list of available generators
-    my @list;
+    my @gennys;
     foreach my $place (@INC) {
         my $d;
         if ( opendir( $d, "$place/Foswiki/Plugins/PublishPlugin/BackEnd" ) ) {
             foreach my $gen ( sort readdir $d ) {
                 next unless ( $gen =~ /^(\w+)\.pm$/ );
-                my $name  = $1;
-                my $entry = $format;
-                $entry =~ s/\$name/$name/g;
-                if ( $entry =~ /\$help/ ) {
-                    my $help;
-                    my $class =
-                      "Foswiki::Plugins::PublishPlugin::BackEnd::$name";
-                    eval "require $class";
-                    if ($@) {
-                        $help = $@;
-                    }
-                    elsif ( !$class->can('DESCRIPTION') ) {
-                        $help = 'no description';
-                    }
-                    else {
-                        $help = $class->DESCRIPTION;
-                    }
-                    $entry =~ s/\$help/$help/g;
+                if ( defined $params->{generator} ) {
+                    next unless $1 eq $params->{generator};
                 }
-                push( @list, $entry );
+                push( @gennys, $1 );
             }
         }
     }
+
+    my @list;
+    foreach my $name ( sort @gennys ) {
+        my $entry = $format;
+        $entry =~ s/\$name/$name/g;
+        my $class;
+        if ( $entry =~ /\$(help|params)/ ) {
+            $class = "Foswiki::Plugins::PublishPlugin::BackEnd::$name";
+            eval "require $class";
+            if ($@) {
+                $entry =~ s/\$help/$@/ge;
+            }
+            else {
+                $entry =~ s/\$help/$class->DESCRIPTION/ge;
+                $entry =~ s/\$params=\((.*?)\)/$class->describeParams($1)/ge;
+            }
+        }
+        push( @list, $entry );
+    }
+
     return Foswiki::Func::decodeFormatTokens( join( $separator, @list ) );
 }
 

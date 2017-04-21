@@ -23,13 +23,11 @@ package Foswiki::Plugins::PublishPlugin::BackEnd::ftp;
 
 use strict;
 
-# Inherit from file backend, but only to get the benefit of index
-# file generation
 use Foswiki::Plugins::PublishPlugin::BackEnd::file;
 our @ISA = ('Foswiki::Plugins::PublishPlugin::BackEnd::file');
 
 use constant DESCRIPTION =>
-'Upload generated HTML to an FTP site. Options controlling the upload can be set below.';
+'Upload generated HTML and resources to an FTP site. The generated directory structure is the same as for the =file= generator';
 
 use File::Temp qw(:seekable);
 use File::Spec;
@@ -37,6 +35,7 @@ use File::Spec;
 sub new {
     my ( $class, $params, $logger ) = @_;
 
+    $params->{dont_scan_existing} = 1;
     my $this = $class->SUPER::new( $params, $logger );
 
     $this->{params}->{fastupload} ||= 0;
@@ -57,42 +56,26 @@ sub new {
 
 sub param_schema {
     my $class = shift;
-    return {
-        destinationftpserver   => {},
-        destinationftppath     => {},
-        destinationftpusername => {},
-        destinationftppassword => {},
-        fastupload             => { default => 1 },
+    my $base  = {
+        destinationftpserver =>
+          { desc => 'Server host name e.g. some.host.name' },
+        destinationftppath =>
+          { desc => 'Root path on the server to upload to' },
+        destinationftpusername => { desc => 'FTP server username' },
+        destinationftppassword => { desc => 'FTP server password' },
+        fastupload             => {
+            desc =>
+'Speed up the ftp publishing by only uploading modified files. This will store a (tiny) checksum (.md5) file on the server alongside each uploaded file which will be used to optimise future uploads. Recommended.',
+            default => 1
+        },
         %{ $class->SUPER::param_schema() }
     };
+    delete $base->{outfile};
+    delete $base->{relativedir};
+    return $base;
 }
 
-sub addTopic {
-    my ( $this, $web, $topic, $text ) = @_;
-
-    my $u = $this->SUPER::getTopicPath( $web, $topic );
-    $this->_upload( $text, $u );
-    return $u;
-}
-
-sub addAttachment {
-    my ( $this, $web, $topic, $attachment, $data ) = @_;
-    my $u = $this->pathJoin( $web, $topic . '.attachments', $attachment );
-    $this->_upload( $data, $u );
-    return $u;
-}
-
-sub addResource {
-    my ( $this, $data, $ext ) = @_;
-    $ext //= '';
-    my $path = $this->{rsrc_path};
-    $this->{resource_id}++;
-    $path = "$path/rsrc$this->{resource_id}$ext";
-    $this->_upload( $data, $path );
-    return $path;
-}
-
-sub addRootFile {
+sub addByteData {
     my ( $this, $file, $data ) = @_;
     $this->_upload( $data, $file );
     return $file;
@@ -229,22 +212,13 @@ sub _ftpConnect {
 sub close {
     my $this = shift;
 
-    my $landed = $this->SUPER::close();
+    # SUPER::close will generate index files and sitemap
+    $this->SUPER::close();
 
-    if ( $this->{params}->{destinationftpserver} ) {
-        $landed = $this->{params}->{destinationftpserver};
-        $this->{ftp_interface}->quit() if $this->{ftp_interface};
-        $this->{ftp_interface} = undef;
-    }
+    $this->{ftp_interface}->quit() if $this->{ftp_interface};
+    $this->{ftp_interface} = undef;
 
-    # Kill local copies
-    my $tmpdir = "$this->{path}$this->{params}->{outfile}";
-    if ( $this->{params}->{destinationftpserver} ) {
-
-        # There's a server, we should expect an upload
-        File::Path::rmtree($tmpdir);
-    }
-    return $landed;
+    return $this->{params}->{destinationftpserver};
 }
 
 1;
