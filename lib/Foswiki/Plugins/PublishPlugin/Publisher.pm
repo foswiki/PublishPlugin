@@ -498,6 +498,7 @@ TEXT
             @topics = grep { !/$re$/ } @topics;
         }
     }
+    print join( " ", @topics ) . "\n";
 
     # Choose template. Note that $template_TEMPLATE can still override
     # this in specific topics.
@@ -507,7 +508,7 @@ TEXT
     die "Couldn't find skin template $this->{opt}->{template}\n"
       if ( !$this->{skin_template} );
 
-    $this->{copied_resources} = [];
+    $this->{copied_resources} = {};
 
     # Make a map of topic versions for every published web, if
     # 'versions' was given
@@ -562,7 +563,7 @@ TEXT
 
     foreach my $wt (@topics) {
         try {
-            $this->_publishTopic( split( '.', $wt, 2 ) );
+            $this->_publishTopic( split( /\./, $wt, 2 ) );
         }
         catch Error::Simple with {
             my $e = shift;

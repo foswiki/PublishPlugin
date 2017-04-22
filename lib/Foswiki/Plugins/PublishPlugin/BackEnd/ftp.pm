@@ -72,6 +72,7 @@ sub param_schema {
     };
     delete $base->{outfile};
     delete $base->{relativedir};
+    delete $base->{keep};
     return $base;
 }
 

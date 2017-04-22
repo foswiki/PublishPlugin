@@ -56,6 +56,7 @@ sub param_schema {
     my $base  = $class->SUPER::param_schema();
     $base->{outfile}->{default} = 'pdf';
     delete $base->{googlefile};
+    delete $base->{keep};
     return $base;
 }
 
@@ -71,7 +72,7 @@ sub addByteData {
     }
     print $fh $data;
     close($fh);
-    $this->{html_files}->{$fn} = 1 if $path =~ /\.html/;
+    push( @{ $this->{html_files} }, $fn ) if $path =~ /\.html/;
     return $path;
 }
 
@@ -82,13 +83,11 @@ sub close {
     $ENV{HTMLDOC_DEBUG} = 1;    # see man htmldoc - goes to apache err log
     $ENV{HTMLDOC_NOCGI} = 1;    # see man htmldoc
 
-    my @files = keys %{ $this->{html_files} };
-
     my ( $data, $exit ) = Foswiki::Sandbox::sysCommand(
         undef,
         $Foswiki::cfg{Plugins}{PublishPlugin}{PDFCmd},
         FILE   => $this->{pdf_file},
-        FILES  => \@files,
+        FILES  => $this->{html_files},
         EXTRAS => []
     );
 

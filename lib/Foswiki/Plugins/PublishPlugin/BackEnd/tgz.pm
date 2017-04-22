@@ -50,6 +50,7 @@ sub new {
 sub param_schema {
     my $class = shift;
     my $base  = $class->SUPER::param_schema();
+    delete $base->{keep};
     $base->{outfile}->{default} = 'tgz';
     return $base;
 }

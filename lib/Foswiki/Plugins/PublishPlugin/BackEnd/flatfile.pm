@@ -45,6 +45,14 @@ sub new {
     return $this;
 }
 
+sub param_schema {
+    my $class = shift;
+    my $base  = $class->SUPER::param_schema();
+    delete $base->{keep};
+    $base->{outfile}->{default} = 'flatfile';
+    return $base;
+}
+
 sub _makeAnchor {
     my ( $w, $t ) = @_;
     my $s = "$w/$t";

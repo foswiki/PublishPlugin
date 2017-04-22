@@ -47,10 +47,15 @@ sub new {
     $this->{resource_id} = 0;
 
     # Capture HTML generated for use by subclasses
-    $this->{html_files} = {};
+    $this->{html_files} = [];
 
-    unless ( $params->{dont_scan_existing} ) {
+    if ( $params->{keep} ) {
+        print STDERR "SCANNING\n";
         $this->_scanExistingHTML( $this->{file_root}, '' );
+    }
+    else {
+        print STDERR "Expunging\n";
+        File::Path::rmtree( $this->{file_root} );
     }
 
     return $this;
@@ -68,7 +73,8 @@ sub _scanExistingHTML {
             $this->_scanExistingHTML( $root, $relpath ? "$relpath/$f" : $f );
         }
         elsif ( $relpath && $f =~ /\.html$/ ) {
-            $this->{html_files}->{ Encode::decode_utf8("$relpath/$f") } = 2;
+            push( @{ $this->{html_files} },
+                Encode::decode_utf8("$relpath/$f") );
         }
     }
     closedir($d);
@@ -96,6 +102,11 @@ sub param_schema {
 'Additional path components to put above the top of the published output. See [[%SYSTEMWEB%.PublishPlugin#PublishToTopic][here]] for one way this can be used.',
             default   => '',
             validator => \&validateRelPath,
+        },
+        keep => {
+            default => 0,
+            desc =>
+"Enable to keep previously published topics. The default is to clear down the output each time it is published."
         }
     };
 }
@@ -116,7 +127,7 @@ sub addTopic {
     push( @path, $topic . '.html' );
 
     my $path = $this->pathJoin(@path);
-    $this->{html_files}->{$path} = 1;
+    push( @{ $this->{html_files} }, $path );
     return $this->addByteData( $path, Encode::encode_utf8($text) );
 }
 
@@ -180,18 +191,12 @@ sub addByteData {
 sub close {
     my $this = shift;
 
-    while ( my ( $k, $v ) = each %{ $this->{html_files} } ) {
-        next if $v < 2;
-        $this->{logger}->logInfo( '', 'Adding previously published ' . $k );
-    }
-
     # write sitemap.xml
     my $sitemap =
         '<?xml version="1.0" encoding="UTF-8"?>'
       . '<urlset xmlns="http://www.google.com/schemas/sitemap/0.84">'
       . join( "\n",
-        map { '<url><loc>' . $_ . '</loc></url>'; }
-          keys %{ $this->{html_files} } )
+        map { '<url><loc>' . $_ . '</loc></url>'; } @{ $this->{html_files} } )
       . '</urlset>';
     $this->addByteData( 'sitemap.xml', Encode::encode_utf8($sitemap) );
 
@@ -216,9 +221,8 @@ sub close {
 </head>
 <body>
 HEAD
-    $links .= join( "</br>\n",
-        map { "<a href='$_'>$_</a>" }
-        sort keys %{ $this->{html_files} } );
+    $links .=
+      join( "</br>\n", map { "<a href='$_'>$_</a>" } @{ $this->{html_files} } );
     $links .= "\n</body>";
     $links = Encode::encode_utf8($links);
     $this->addByteData( 'default.htm', $links );
