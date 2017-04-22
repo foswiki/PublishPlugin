@@ -31,7 +31,7 @@ my %PARAM_SCHEMA = (
         validator => \&validateList,
         desc      => 'Enable Plugins'
     },
-    exclusions => { desc => 'Topic Exclude Filter' },
+    exclusions => { desc => 'Topic Exclude Filter (deprecated, use =topics=)' },
     format     => {
         default   => 'file',
         validator => \&validateWord,
@@ -42,8 +42,7 @@ my %PARAM_SCHEMA = (
         validator => \&validateTopicNameOrNull,
         desc      => 'History Topic'
     },
-    inclusions  => { desc => 'Topic Include Filter' },
-    nosubwebs   => { desc => 'Don\' expand subwebs' },
+    inclusions => { desc => 'Topic Include Filter (deprecated, use =topics=)' },
     preferences => {
         default => '',
         desc    => 'Extra Preferences'
@@ -56,10 +55,10 @@ my %PARAM_SCHEMA = (
         default => 'view',
         desc    => 'Template to use for publishing'
     },
-    topics => {
+    topiclist => { desc => 'Deprecated, use =topics=' },
+    topics    => {
         default        => '',
         allowed_macros => 1,
-        validator      => \&validateTopicNameList,
         desc           => 'Topics'
     },
     rexclude => {
@@ -71,16 +70,14 @@ my %PARAM_SCHEMA = (
         validator => \&validateList,
         desc      => 'Versions Topic'
     },
-    webs => { validator => \&validateWebNameList },
+    web => { desc => 'Deprecated, use =topics=' },
 
     # Renamed options
     filter      => { renamed => 'rexclude' },
     instance    => { renamed => 'relativedir' },
     genopt      => { renamed => 'extras' },
     topicsearch => { renamed => 'rexclude' },
-    skin        => { renamed => 'publishskin' },
-    topiclist   => { renamed => 'topics' },
-    web         => { renamed => 'webs' }
+    skin        => { renamed => 'publishskin' }
 );
 
 sub validateRE {
@@ -330,7 +327,7 @@ sub _wildcards2RE {
     my $v = shift;
     $v =~ s/([*?])/.$1/g;
     $v =~ s/\s*,\s*/|/g;
-    return "^($v)\$";
+    return qr/$v/;
 }
 
 sub publish {
@@ -340,7 +337,19 @@ sub publish {
     # NEWTOPICLINKSYMBOL LINKTOOLTIPINFO
     $Foswiki::Plugins::SESSION->renderer()->{NEWLINKSYMBOL} = '';
 
-    $this->{historyText} = '';
+    # Generate the progress information screen (based on the view template)
+    my ( $header, $footer ) = ( '', '' );
+    unless ( Foswiki::Func::getContext()->{command_line} ) {
+
+        # running from CGI
+        if ( defined $Foswiki::Plugins::SESSION->{response} ) {
+            $Foswiki::Plugins::SESSION->generateHTTPHeaders();
+            $Foswiki::Plugins::SESSION->{response}
+              ->print( CGI::start_html( -title => 'Foswiki: Publish' ) );
+        }
+        ( $header, $footer ) =
+          $this->_getPageTemplate( $Foswiki::cfg{SystemWebName} );
+    }
 
     # Handle =enableplugins=. We simply muddy-boots the foswiki config.
     if ( $this->{opts}->{enableplugins} ) {
@@ -373,20 +382,6 @@ sub publish {
         }
     }
 
-    # Generate the progress information screen (based on the view template)
-    my ( $header, $footer ) = ( '', '' );
-    unless ( Foswiki::Func::getContext()->{command_line} ) {
-
-        # running from CGI
-        if ( defined $Foswiki::Plugins::SESSION->{response} ) {
-            $Foswiki::Plugins::SESSION->generateHTTPHeaders();
-            $Foswiki::Plugins::SESSION->{response}
-              ->print( CGI::start_html( -title => 'Foswiki: Publish' ) );
-        }
-        ( $header, $footer ) =
-          $this->_getPageTemplate( $Foswiki::cfg{SystemWebName} );
-    }
-
     $this->logInfo( 'Publisher', Foswiki::Func::getWikiName() );
     $this->logInfo( 'Date',      Foswiki::Func::formatTime( time() ) );
     $this->_loadParams($params);
@@ -396,6 +391,7 @@ sub publish {
       || 'basic_publish';
 
     if ( $this->{opt}->{history} ) {
+        $this->{historyText} = '';
         my ( $hw, $ht ) =
           Foswiki::Func::normalizeWebTopicName( undef,
             $this->{opt}->{history} );
@@ -417,6 +413,7 @@ TEXT
 
     # Push preference values. Because we use session preferences (preferences
     # that only live as long as the request) these values will not persist.
+    # They may also be overridden locally in topics.
     if ( defined $this->{opt}->{preferences} ) {
         my $sep =
           Foswiki::Func::getContext()->{command_line} ? qr/;/ : qr/\r?\n/;
@@ -428,74 +425,149 @@ TEXT
         }
     }
 
-    # Force static context for all published topics
-    Foswiki::Func::getContext()->{static} = 1;
+    # Start by making a total ordering of topics to be published
+    my @topics;
 
-    # Start by making a master list of all published topics. We do this
-    # so we can detect whether a topic is in the publish set when
-    # remapping links. Note that we use /, not ., in the path. This is
-    # to make matching URL paths easier.
-    my @wl;
-    if ( $this->{opt}->{webs} ) {
-        @wl = split( /\s*,\s*/, $this->{opt}->{webs} );
+    if ( $this->{opt}->{topics} ) {
 
-        # Get subwebs
-        unless ( $this->{opt}->{nosubwebs} ) {
-            @wl = map { $_, Foswiki::Func::getListOfWebs( undef, $_ ) } @wl;
+        # Get a total list of webs (and subwebs)
+        my %webs = map { $_ => undef } Foswiki::Func::getListOfWebs();
+
+        my @wild = split( /\s*,\s*/, $this->{opt}->{topics} );
+
+        foreach my $expr (@wild) {
+            my $filter = ( $expr =~ s/^-// );
+
+            my ( $w, $t ) = split( /\./, $expr, 2 );
+            if ( $w && !$t ) {
+                $t = $w;
+                $w = '*';
+            }
+            $w = '*' unless length($w);
+            $t = '*' unless length($t);
+
+            my $wre = _wildcards2RE($w);
+            my $tre = _wildcards2RE($t);
+            if ($filter) {
+                my @filtered;
+                while ( my $twt = pop(@topics) ) {
+                    ( $w, $t ) = split( /\./, $twt, 2 );
+                    unless ( $twt =~ /^$wre\.$tre$/ ) {
+                        push( @filtered, $twt );
+                    }
+                }
+                @topics = @filtered;
+            }
+            else {
+                foreach my $tw ( grep { /^$wre$/ } sort keys %webs ) {
+                    unless ( defined $webs{$tw} ) {
+                        $webs{$tw} =
+                          [ sort map { "$tw.$_" }
+                              Foswiki::Func::getTopicList($tw) ];
+                    }
+                    push( @topics, grep { /^$wre\.$tre$/ } @{ $webs{$tw} } );
+                }
+            }
         }
     }
     else {
-        # get a list of ALL webs
-        @wl = Foswiki::Func::getListOfWebs();
+        # Compatibility; handle =web=, =topiclist=, =inclusions=, =exclusions=
+        my $web = $this->{opt}->{web};
+        die "'topics' parameter missing" unless $web;
 
-        # Filter subwebs
-        @wl = grep { !m:/: } @wl if $this->{opt}->{nosubwebs};
-    }
-
-    # uniq
-    my %wl       = map { $_ => 1 } @wl;
-    my @webs     = sort keys %wl;
-    my $firstWeb = $webs[0];
-
-    my %topics = ();
-    foreach my $web (@webs) {
-        if ( $this->{opt}->{topics} ) {
-            foreach my $topic ( split( /\s*,\s*/, $this->{opt}->{topics} ) ) {
+        if ( $this->{opt}->{topiclist} ) {
+            my $tl =
+              Foswiki::Func::expandCommonVariables( $this->{opt}->{topiclist} );
+            @topics = map {
                 my ( $w, $t ) =
-                  Foswiki::Func::normalizeWebTopicName( $web, $topic );
-                $topics{"$w.$t"} = 1;
-            }
+                  Foswiki::Func::normalizeWebTopicName( $web, $_ );
+                "$w.$t"
+            } split( /\s*,\s*/, $tl );
         }
         else {
-            foreach my $topic ( Foswiki::Func::getTopicList($web) ) {
-                $topics{"$web.$topic"} = 1;
-            }
+            @topics = map { "$web.$_" } Foswiki::Func::getTopicList($web);
+        }
+
+        if ( $this->{opt}->{inclusions} ) {
+            my $re = _wildcards2RE( $this->{opt}->{inclusions} );
+            @topics = grep { /$re$/ } @topics;
+        }
+
+        if ( $this->{opt}->{exclusions} ) {
+            my $re = _wildcards2RE( $this->{opt}->{exclusions} );
+            @topics = grep { !/$re$/ } @topics;
         }
     }
-    my @topics = sort keys %topics;
 
-    if ( $this->{opt}->{inclusions} ) {
-        my $re = _wildcards2RE( $this->{opt}->{inclusions} );
-        @topics = grep { /$re$/ } @topics;
-    }
+    # Choose template. Note that $template_TEMPLATE can still override
+    # this in specific topics.
+    $this->{skin_template} =
+      Foswiki::Func::readTemplate( $this->{opt}->{template},
+        $this->{opt}->{publishskin} );
+    die "Couldn't find skin template $this->{opt}->{template}\n"
+      if ( !$this->{skin_template} );
 
-    if ( $this->{opt}->{exclusions} ) {
-        my $re = _wildcards2RE( $this->{opt}->{exclusions} );
-        @topics = grep { !/$re$/ } @topics;
-    }
+    $this->{copied_resources} = [];
 
-    # Determine the set of topics for each unique web
-    my %webset;
-    foreach my $t (@topics) {
-        my ( $w, $t ) = Foswiki::Func::normalizeWebTopicName( undef, $t );
-        $webset{$w} //= [];
-        push( @{ $webset{$w} }, $t );
+    # Make a map of topic versions for every published web, if
+    # 'versions' was given
+    $this->{topicVersions} = {};
+    if ( $this->{opt}->{versions} ) {
+        my %webs;
+        foreach my $topic (@topics) {
+            my ( $w, $t ) = split( '.', $topic, 2 );
+            $webs{$w} = 1;
+        }
+        foreach my $web ( keys %webs ) {
+            my ( $vweb, $vtopic ) =
+              Foswiki::Func::normalizeWebTopicName( $web,
+                $this->{opt}->{versions} );
+            next unless Foswiki::Func::topicExists( $vweb, $vtopic );
+            next unless $vweb eq $web;
+            my ( $meta, $text ) = Foswiki::Func::readTopic( $vweb, $vtopic );
+            $text =
+              Foswiki::Func::expandCommonVariables( $text, $vtopic, $vweb,
+                $meta );
+            my $pending;
+            my $count = 0;
+            foreach my $line ( split( /\r?\n/, $text ) ) {
+
+                if ( defined $pending ) {
+                    $line =~ s/^\s*//;
+                    $line = $pending . $line;
+                    undef $pending;
+                }
+                if ( $line =~ s/\\$// ) {
+                    $pending = $line;
+                    next;
+                }
+                if ( $line =~ /^\s*\|\s*(.*?)\s*\|\s*(?:\d\.)?(\d+)\s*\|\s*$/ )
+                {
+                    my ( $t, $v ) = ( $1, $2 );
+                    ( $vweb, $vtopic ) =
+                      Foswiki::Func::normalizeWebTopicName( $web, $t );
+                    $this->{topicVersions}->{"$vweb.$vtopic"} = $v;
+                    $count++;
+                }
+            }
+            die "Versions topic $vweb.$vtopic contains no topic versions"
+              unless $count;
+        }
     }
 
     $this->{archive} = $this->{generator}->new( $this->{opt}, $this );
 
-    while ( my ( $w, $ts ) = each %webset ) {
-        $this->_publishInWeb( $w, $ts );
+    # Force static context for all published topics
+    Foswiki::Func::getContext()->{static} = 1;
+
+    foreach my $wt (@topics) {
+        try {
+            $this->_publishTopic( split( '.', $wt, 2 ) );
+        }
+        catch Error::Simple with {
+            my $e = shift;
+            $this->logError( "$wt not published: " . ( $e->{-text} || '' ) );
+        };
     }
 
     # Close archive
@@ -561,70 +633,6 @@ TEXT
     Foswiki::Plugins::PublishPlugin::_display($footer);
 }
 
-# $web - the web to publish in
-# \@topics - list of topics in this web to publish
-sub _publishInWeb {
-    my ( $this, $web, $topics ) = @_;
-
-    $this->logInfo( '', "<h2>Publishing in web '$web'</h2>" );
-    $this->{topicVersions} = {};
-
-    if ( $this->{opt}->{versions} ) {
-        my ( $vweb, $vtopic ) =
-          Foswiki::Func::normalizeWebTopicName( $web,
-            $this->{opt}->{versions} );
-        die "Versions topic $vweb.$vtopic does not exist"
-          unless Foswiki::Func::topicExists( $vweb, $vtopic );
-        my ( $meta, $text ) = Foswiki::Func::readTopic( $vweb, $vtopic );
-        $text =
-          Foswiki::Func::expandCommonVariables( $text, $vtopic, $vweb, $meta );
-        my $pending;
-        my $count = 0;
-        foreach my $line ( split( /\r?\n/, $text ) ) {
-
-            if ( defined $pending ) {
-                $line =~ s/^\s*//;
-                $line = $pending . $line;
-                undef $pending;
-            }
-            if ( $line =~ s/\\$// ) {
-                $pending = $line;
-                next;
-            }
-            if ( $line =~ /^\s*\|\s*(.*?)\s*\|\s*(?:\d\.)?(\d+)\s*\|\s*$/ ) {
-                my ( $t, $v ) = ( $1, $2 );
-                ( $vweb, $vtopic ) =
-                  Foswiki::Func::normalizeWebTopicName( $web, $t );
-                $this->{topicVersions}->{"$vweb.$vtopic"} = $v;
-                $count++;
-            }
-        }
-        die "Versions topic $vweb.$vtopic contains no topic versions"
-          unless $count;
-    }
-
-    # Choose template. Note that $template_TEMPLATE can still override
-    # this in specific topics.
-    my $tmpl = Foswiki::Func::readTemplate( $this->{opt}->{template},
-        $this->{opt}->{publishskin} );
-    die "Couldn't find skin template $this->{opt}->{template}\n" if ( !$tmpl );
-
-    # Keep a record of resources we copy, so we don't try to do them twice
-    $this->{copied_resources} = {};
-
-    # Attempt to render each included page.
-    foreach my $topic (@$topics) {
-        try {
-            $this->_publishTopic( $web, $topic, $tmpl );
-        }
-        catch Error::Simple with {
-            my $e = shift;
-            $this->logError(
-                "$web.$topic not published: " . ( $e->{-text} || '' ) );
-        };
-    }
-}
-
 # get a template for presenting output / interacting (*not* used
 # for published content)
 sub _getPageTemplate {
@@ -676,7 +684,8 @@ sub logInfo {
         $header = '';
     }
     Foswiki::Plugins::PublishPlugin::_display( $header, $body, CGI::br() );
-    $this->{historyText} .= "$header$body%BR%\n";
+    $this->{historyText} .= "$header$body%BR%\n"
+      if ( $this->{opt}->{history} );
 }
 
 sub logWarn {
@@ -684,7 +693,8 @@ sub logWarn {
     Foswiki::Plugins::PublishPlugin::_display(
         CGI::span( { class => 'foswikiAlert' }, $message ) );
     Foswiki::Plugins::PublishPlugin::_display( CGI::br() );
-    $this->{historyText} .= "%ORANGE% *WARNING* $message %ENDCOLOR%%BR%\n";
+    $this->{historyText} .= "%ORANGE% *WARNING* $message %ENDCOLOR%%BR%\n"
+      if ( $this->{opt}->{history} );
 }
 
 sub logError {
@@ -692,13 +702,16 @@ sub logError {
     Foswiki::Plugins::PublishPlugin::_display(
         CGI::span( { class => 'foswikiAlert' }, "ERROR: $message" ) );
     Foswiki::Plugins::PublishPlugin::_display( CGI::br() );
-    $this->{historyText} .= "%RED% *ERROR* $message %ENDCOLOR%%BR%\n";
+    $this->{historyText} .= "%RED% *ERROR* $message %ENDCOLOR%%BR%\n"
+      if ( $this->{opt}->{history} );
 }
 
 #  Publish one topic from web.
 #   * =$topic= - which topic to publish (web.topic)
 sub _publishTopic {
-    my ( $this, $web, $topic, $tmpl ) = @_;
+    my ( $this, $web, $topic ) = @_;
+
+    my $tmpl = $this->{skin_template};
 
     # Read topic data.
     ( $web, $topic ) = Foswiki::Func::normalizeWebTopicName( $web, $topic );
@@ -798,6 +811,11 @@ sub _publishTopic {
     }
     $text = $newText;
 
+    Foswiki::Func::setPreferencesValue( 'TEXT',     $text );
+    Foswiki::Func::setPreferencesValue( 'MAXREV',   $maxrev );
+    Foswiki::Func::setPreferencesValue( 'CURRREV',  $publishRev || $maxrev );
+    Foswiki::Func::setPreferencesValue( 'REVTITLE', '' );
+
     # Expand and render the template
     $tmpl = Foswiki::Func::expandCommonVariables( $tmpl, $topic, $web, $meta );
 
@@ -805,16 +823,6 @@ sub _publishTopic {
     # simulate the way the view script splits up the topic and reassembles
     # it around newlines.
     $text = "\n$text" unless $text =~ /^\n/s;
-
-    $tmpl =~ s/%TEXT%/$text/;
-
-    # legacy
-    $tmpl =~ s/<nopublish>.*?<\/nopublish>//gs;
-
-    $tmpl =~ s/.*?<\/nopublish>//gs;
-    $tmpl =~ s/%MAXREV%/$maxrev/g;
-    $tmpl =~ s/%CURRREV%/$maxrev/g;
-    $tmpl =~ s/%REVTITLE%//g;
 
     # trim spaces at start and end
     $tmpl =~ s/^[[:space:]]+//s;    # trim at start

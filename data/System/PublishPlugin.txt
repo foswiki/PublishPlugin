@@ -121,54 +121,21 @@ table.publishForm .paramCol {
       </tr>
       <tr>
         <td class="nameCol">
-          Webs
-        </td>
-        <td class="inputCol">
-          <select name="web" class="foswikiSelect">
-            <option value=""></option>%WEBLIST{"<option $marker value='$name'>$name</option>" selection="%URLPARAM{"webs" default="%WEB%" encode="entity"}%"}%</select>
-          <input type="checkbox" name="nosubwebs" class="foswikiCheckbox" title="Select to disable subweb expansion in the =webs= parameter"/> No subwebs
-        </td>
-        <td class="infoCol" rowspan="2">
-The list of topics to publish is built using the =webs= and =topics=
-parameters.
-
-The =webs= parameter is used to give a list<sup>1</sup> of web names,
-and the =topics= parameter to give a list<sup>1</sup> of topic names.
-
-The final list of topics is built up from these parameters as follows:
-   1 If =webs= is blank, make a list of _all_ webs (and subwebs<sup>2</sup>) in the wiki
-      * If =webs= if _not_ blank, expand each web in the list to
-        include all subwebs of those webs<sup>2</sup>
-   1 If =topics= is blank, make a list of all topics in the webs found in step 1
-      * If =topics= is _not_ blank, then for each entry in the list:
-         1 If the entry _does not_ specify a web, look for it in all
-           webs found in step 1, and add any matches to the topic list
-            * If the topic does specify a web, add it to the list of topics
-   1 If =inclusions= is not blank, filter the list of topics to include only
-     those topics that match
-   1 If =exclusions= is not blank, filter the list of topics to exclude
-     those topics that match
-
-<sup>1</sup> Lists are comma-separated. You can use Foswiki macros
-(such as %SEARCH) in both these parameters. However they do _not_
-support wildcards.
-
-<sup>2</sup> You can turn off subweb expansion using the =nosubwebs=
-parameter.
-        </td>
-        <td class="paramCol">
-          =webs=
-
-          =nosubwebs=
-        </td>
-      </tr>
-      <tr>
-        <td class="nameCol"> 
           Topics
         </td>
-        <td class="inputCol"> 
+        <td class="inputCol">
           <input type="text" name="topics" class="foswikiInputField" value="%URLPARAM{"topics" default="" encode="entity"}%" size="30" title="Leave blank to publish all topics in the web"/>
         </td>
+        <td class="infoCol">
+The =topics= parameter is used to give a (comma-separated) list of web.topic names. These can be specified using  [[#WildcardPattern][wildcard patterns]].
+   * =Myweb.*= will publish all topics in the =Myweb= web (but not in subwebs)
+   * =Myweb*.*= will publish all topics in the =Myweb= web and all it's subwebs
+   * =*.*= will publish all topics in the wiki
+   * =Web.= implies =Web.*=, and =.Topic= and =Topic= both imply =*.Topic=
+   * The list is expanded in left-right order. You can edit the list at any point by prefixing an entry with a =-= sign e.g. =*.*,-*.Last*= will publish all topics in the wiki in web.topic order except topics starting with =Last=
+   * You can use =-= to control the ordering; =*.*,-*.Last*,*.Last*= will do the same, but followed by all topics in the wiki starting with =Last=
+   * If a topic is matched twice in the ordering, it will be published twice (this will be a no-operation for most types of output, but may be useful in PDF)
+   * The order in which web and topic names are expanded is defined by the locale collation.
         <td class="paramCol">
           =topics=
         </td>
@@ -177,36 +144,6 @@ parameter.
         <td colspan="4">
           %TWISTY{mode="div" showlink="Advanced topic selection..."}%
           <table class="foswikiTable publishForm">
-      	    <tr> 
-      	      <td class="nameCol"> 
-	        Topic Include Filter
-	      </td>
-	      <td class="inputCol"> 
-	        <input type="text" name="inclusions" class="foswikiInputField" value="%URLPARAM{"inclusions" default="" encode="entity"}%" size="30" title="Use * to publish all topics in the topic list" />
-	      </td>
-	      <td class="infoCol">
-Comma-separated list of [[#WildcardPattern][wildcard patterns]] that
-match the names of topics to include. This acts as a filter on the
-topic list.
-	      </td>
-	      <td class="paramCol"><code>inclusions</code></td>
-            </tr>
-	    <tr>
-	      <td class="nameCol"> 
-	        Topic Exclude Filter
-	      </td>
-	      <td class="inputCol"> 
-	        <input type="text" name="exclusions" class="foswikiInputField" value="%URLPARAM{"exclusions" default="" encode="entity"}%" size="30" title="Leave blank to include all topics in the topic list" />
-	      </td>
-	      <td class="infoCol">
-Comma-separated list of [[#WildcardPattern][wildcard patterns]] that
-match the names of topics to exclude. This acts as a filter on the
-topic list.
-	      </td>
-	      <td class="paramCol">
-	        =exclusions=
-	      </td>
-	    </tr>
 	    <tr>
 	      <td class="nameCol"> 
 	        Versions Topic
@@ -489,7 +426,6 @@ You can control what gets published from a topic using =%<nop>STARTPUBLISH%= and
    * If =%<nop>STARTPUBLISH%= is the first control tag seen in the file, everything before it will be ignored.
    * Everything between =%<nop>STOPPUBLISH%= and the next =%<nop>STARTPUBLISH%= (or the end of the topic) will be ignored.
    * =%<nop>STARTPUBLISH%= and =%<nop>STOPPUBLISH%= will be visible in the viewed topic, so you can easily see what will be published from the topic.
-Note: the old &lt;nopublish> tag is deprecated and should be replaced in topics
 
 Another good trick is to set up a special "publishing" web. Create topics in the web that %INCLUDE the topics from *other* webs that you want to publish. You can use [[%SYSTEMWEB%.VarSTARTSECTION][STARTSECTION]] and [[%SYSTEMWEB%.VarENDSECTION][ENDSECTION]] to highlight what you want published. This way the "publishing" web gives you a view of exactly what will be in the published output, without the need for special publishing tags.
 
@@ -499,7 +435,7 @@ A wildcard is a special string that you can put into a filename so that it match
 | *String* | *What  it does* | *Example* | *What the example matches* |
 | * | Matches any string, including an empty string. | =*Cheese*= | Every topic with "Cheese" somewhere in the name (but _not_ "cheese") |
 | ? | Matches any single character. | Example1? | Example10 and Example 1X but _not_ example1 |
-| [...] | Matches any one of the enclosed characters.  A pair of characters separated by a hyphen denotes a range  expression; any  character that sorts between those two characters, inclusive, using the current locale's collating sequence and character set, is matched.  If the first character following the [ is a ^ then any character not enclosed is matched. A - may be matched by including it as the first or  last  character  in  the set.  A ] may be matched by including it as the first character in the set.<br /> Within  [  and ], character classes can be specified using the syntax [:class:], where class is one of the following classes defined in the POSIX.2 standard: =alnum=, =alpha=, =ascii=, =blank=, =cntrl=, =digit=, =graph=, =lower=, =print=, =punct=, =space=, =upper=, =word=, =xdigit=. A character class matches any character belonging to that class.  The =word= character class matches letters, digits, and the character _. | B[aeiou]g | Bag, Bog, Big, Beg, Bug |
+| [...] | Matches any one of the enclosed characters.  A pair of characters separated by a hyphen denotes a range  expression; any  character that sorts between those two characters, inclusive, using the current locale's collating sequence and character set, is matched.  If the first character following the =[= is a =^= then any character not enclosed is matched. A =-= may be matched by including it as the first or  last  character  in  the set.  A =]= may be matched by including it as the first character in the set.<br /> Within  =[=  and =]=, character classes can be specified using the syntax =[:class:]=, where =class= is one of the following classes defined in the POSIX.2 standard: =alnum=, =alpha=, =ascii=, =blank=, =cntrl=, =digit=, =graph=, =lower=, =print=, =punct=, =space=, =upper=, =word=, =xdigit=. A character class matches any character belonging to that class.  The =word= character class matches letters, digits, and the character _. | =B[aeiou]g= | Bag, Bog, Big, Beg, Bug |
 
 Irrespective of the archive being used, local output is always generated in
 the directory specified by the ={Plugins}{PublishPlugin}{Dir}= [[%SCRIPTURL{configure}%#PublishPlugin$Extensions][configuration setting]]. Administrators can
@@ -523,7 +459,9 @@ The history topic contains a list of all the parameters used, and the versions o
 
 #PublishToTopic
 ---+++ Publishing to a Topic
-If you are using an on-disk file store, such as !PlainFile or one of the RCS stores, you can publish an attachment direct to a topic. Note that overwriting attachments this way is extremely dangerous, so this should only be done by experts! You have been warned.
+If you are using an on-disk file store, such as !PlainFile or one of the RCS stores, you can publish an attachment direct to a topic.
+
+%X% Note that overwriting attachments this way is extremely dangerous, so this should only be done by experts! You have been warned. %X%
 
    * First set the ={Plugins}{PublishPlugin}{Dir}= to the same as ={PubDir}=
    * Then publish with a =relativedir= setting that corresponds to the attachment directory for the web/topic that you want to attach to
@@ -564,6 +502,12 @@ apply.
 ---++ Dependencies
 
 %$DEPENDENCIES%
+
+---++ Compatibility Notes
+   * The &lt;nopublish> tag has been removed.
+   * The =templates= parameter has been removed. We couldn't find anyone who was using it. The =template= parameter provides a subset of it's functionality.
+   * The =file= generator no longer deletes existing published content before publishing.
+   * The =web=, =topiclist=, =exclusions= and =inclusions= parameters are still supported. They are ignored if =topics= is given. 
 
 ---++ Change History
 
