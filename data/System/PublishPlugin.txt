@@ -363,35 +363,19 @@ don't need a history.
 
 ---+++ Using a =rest= call
 
-Create a link that invokes the =rest= script and pass the current topic in param =inclusions=:
+Create a link that invokes the =rest= script and pass the current topic:
+(added newlines for readability).
 <verbatim>
 <a class='foswikiPopUp'
 href='%SCRIPTURLPATH{"rest"}%/PublishPlugin/publish?%REVARG%;
-web=%BASEWEB%;
-inclusions=%BASETOPIC%;
+topics=%BASEWEB%.%BASETOPIC%;
 format=file;
-skin=myskin;
-defaultpage=WebHome'
 rel='nofollow'>
 Publish this page
 </a>
 </verbatim>
-(added newlines for readability).
 
-Now you can use this link in a skin adaption to put the link (or button) on all pages. Example of a template:
-
-<verbatim>
-%TMPL:INCLUDE{view}%
-
-%TMPL:DEF{"printable"}%<span><a class='foswikiPopUp'
-href='%SCRIPTURLPATH{"rest"}%/PublishPlugin/publish?%REVARG%;
-web=%BASEWEB%;
-inclusions=%BASETOPIC%;
-format=file;
-skin=myskin;
-defaultpage=WebHome'
-rel='nofollow'>Publish this page</a></span>%TMPL:END%
-</verbatim>
+<a class='foswikiPopUp' href='%SCRIPTURLPATH{"rest"}%/PublishPlugin/publish?%REVARG%;topics=%BASEWEB%.%BASETOPIC%;format=file' rel='nofollow'>(Try it)</a>
 
 #BookMaker
 ---+++ Using Bookmaker
@@ -503,16 +487,17 @@ apply.
 
 %$DEPENDENCIES%
 
----++ Compatibility Notes
+---++ Compatibility Notes for version 3.0
+   * The =compress= paramater has been removed.
    * The &lt;nopublish> tag has been removed.
    * The =templates= parameter has been removed. We couldn't find anyone who was using it. The =template= parameter provides a subset of it's functionality.
    * The =file= generator no longer deletes existing published content before publishing.
-   * The =web=, =topiclist=, =exclusions= and =inclusions= parameters are still supported. They are ignored if =topics= is given. 
+   * The =web=, =topiclist=, =exclusions= and =inclusions= parameters are still supported, but are undocumented and will be removed in a later version. They are ignored if =topics= is given. 
 
 ---++ Change History
 
 %TABLE{columnwidths="10em" tablewidth="100%"}%
-|  3.0 (19 Apr 2017) | Extensively rewritten to separate concerns and get rid of some of the poor code that had crept in over the years. Removed ability to publish several templates in one go, due to performance and complexity concerns. Removed flatpdf format, as it's pretty useless with modern htmldoc. Renamed =topiclist= to =topics=, =topicsearch= to =rexclude= and =skin= to =publishskin=. WARNING: untested on Foswiki <2 |
+|  3.0 (22 Apr 2017) | Crawford Currie extensively rewrote to separate concerns and get rid of some of the poor code that had crept in over the years. Removed ability to publish several templates in one go, due to performance and complexity concerns. Removed flatpdf format, as it's pretty useless with modern htmldoc. Deprecated =web=, =topiclist=, =inclusions=, =exclusions= and simplified to one parameter, =topics=, renamed =topicsearch= to =rexclude= and =skin= to =publishskin=. WARNING: untested on Foswiki <2 |
 |  2.5 (25 Jan 2017) | Update to work with Foswiki 2.x.  Foswikitask:Item14198 Foswikitask:Item11808 Foswikitask:Item8898  |
 |  2.4 (30 Jul 2012) | Foswikitask:Item12016 Add capability to construct flat HTML and PDF files. Bugfixes: Foswikitask:Item11988 Foswikitask:Item11339 Foswikitask:Item11345 Foswikitask:Item8260 Foswikitask:Item10597 Foswikitask:Item11346 |
 |  2.3.2 (10 Aug 2011) | Foswikitask:Item10944: Fix publishing of attachments |
@@ -530,42 +515,6 @@ apply.
 |  2.0.2 (18 Mar 2009) | Foswikitask:Item804: automatically create publish dir Foswikitask:Item8078: support publishing to a subdir of the publish dir, under url param control |
 |  2.0.1 (14 Feb 2009) | Foswikitask:Item1033: fixed button in PublishWeb |
 |  2.0.0 (27 Nov 2008) | Foswikitask:Item8019: refactored as a plugin and tested in Foswiki |
-|  1.6.5 (27 Oct 2008) | Foswikitask:Item5385: Fixed doc for configtopic Foswikitask:Item5388: $WEB and $TOPIC were not correct in %IF statements Foswikitask:Item5390: remove comments from .css before processing for included resoures Foswikitask:Item5706: Improved FTP upload process for incrementally maintained webs Foswikitask:Item6029: expand config topic on load to support use of searches Foswikitask:Item6030: respect VIEW_TEMPLATE in published topics Foswikitask:Item6092: expand common tags in configtopic Foswikitask:Item6094: move sitemap options into base file generator Foswikitask:Item6110: rename settings in config topic to avoid clashes with other plugins |
-|  1.6.4 (11 Dec 2007) | Foswikitask:Item5099 fixed |
-|  1.6.3 (10 Nov 2007) | Tested on 4.2.0. Foswikitask:Item4624:, Foswikitask:Item4625: Foswikitask:Item4830: fixed. Foswikitask:Item4825: added a basic skin to avoid the confusion caused by =text= skin. Foswikitask:Item4951: added interface to allow management of output files |
-|  1.6.2 | fixed ftp publish, added doco, and added enabled plugin selection funcitonality |
-|  1.6.1 | Foswikitask:Item3722 worked around core attaching URL params to internal URLs |
-|  1.6.0 | Foswikitask:Item3671 cannot publish without write access to history topic, so \
-security now checked early. Foswikitask:Item3619 Cleaned up error handling from \
-writers. Foswikitask:Item3675 added history topic to record changeset. Plus major \
-refactoring of main class to get rid of some of the cruft that had built \
-up from many authors. Foswikitask:Item2726: uses getExternalResource now, so should \
-obey proxy settings (untested) |
-|  1.5.5 | Added support for new internal api - no user changes |
-|  1.5.4 | Added UI for FTP. Added .spec file. Fixed Foswikitask:Item3515 and Foswikitask:Item2725 |
-|  1.5.3 | Michael Daum - create a new wiki object for every topic, don't reuse the current one (Foswikitask:Item3139) |
-|  1.5.2 | Correction to the correction for anchors. |
-|  1.5.1 | Correction to support anchors in URLs properly |
-|  1.5.0 | Martin Cleaver - changes to allow generation of viewprint and viewxxx when specified by TEMPLATE; multiple INSTANCE (dev/test/prod); (Foswikitask:Item2269) |
-|  1.4.3 | Bugfix Foswikitask:Item2216 |
-|  1.4.2 | Crawford Currie - fixed problem where it was failing to remove <base> tags completely (Foswikitask:Item2200) |
-|  1.4.1 | Crawford Currie - added doc on usage from command line, corrected sense of topicsearch filter (Foswikitask:Item2120, Foswikitask:Item2121), renamed parameters (old ones are still valid), corrected handling of empty web refs (Foswikitask:Item2128), deprecated nopublish html-style tag in favour of !PublishWebPlugin-compatible style (though with richer semantics) (Foswikitask:Item2196) |
-|  1.4.0 | Crawford Currie - added support for hierarchical webs, and inclusion of external images. |
-|  1.3.9 | Crawford Currie - added tgz and pdf support |
-|  1.3.8 | Michael Daum - fixed rewriting urls; \
-fixed nested resources issue; \
-creating a new prefs object for each topic |
-|  1.3.7 | Corrected form action so it uses up the right web preferences |
-|  1.3.6 | Michael Daum - recursively archive resources imported by css files;\
-fixed several html errors in the !PublishPlugin and !PublishWeb topics;\
-removed hardcoded reference to print.pattern |
-|  1.3.5 | TWiki-4 version. Also supports publishing to a file area, making TWiki easier to use as a CMS (see also Foswiki:Extensions/PublishWebPlugin, which does almost the same thing :-( ) |
-|  1.3.4 | Foswikitask:Item196 - bugfix for HTTP_HOST, as described in the Dev topic for the contrib |
-|  1.3.3 | Changed interface to support wildcards, and lightened the plugin by replacing a lot of files with simpler ways of doing things. |
-|  1.3.2 | Added Compress::Zlib dependency, as requested by Brad Taylor |
-|  1.3.1 (27 Apr 2005) | Crawford Currie - fixed minor issues highlighted by Bruce Dillahunty and Scott Claridge |
-|  1.3.0 (11 Apr 2005) | Crawford Currie - reworked the interface and code to work better |
-|  1.2.0 (13 October 2004) | Crawford Currie - Cairo compatible |
 |  1.1.0 (7 Jan 2003) | Initial version |
 
 ---++ Info & Copyright
@@ -595,7 +544,7 @@ http://www.gnu.org/copyleft/gpl.html
 %META:FIELD{name="Release" title="Release" value="%25$RELEASE%25"}%
 %META:FIELD{name="Description" title="Description" value="%25$SHORTDESCRIPTION%25"}%
 %META:FIELD{name="Repository" title="Repository" value="https://github.com/foswiki/%25TOPIC%25"}%
-%META:FIELD{name="Copyright" title="Copyright" value="&copy; 2006-2017, Foswiki Contributors, &copy; 2004-2006 Crawford Currie http://c-dot.co.uk, &copy; 2002-2003, Eric Scouten., &copy;  2006 Martin Cleaver http://www.cleaver.org, &copy; 2001 Motorola. All Rights Reserved. "}%
+%META:FIELD{name="Copyright" title="Copyright" value="&copy; 2006-2017, Foswiki Contributors, &copy; 2004-2017 Crawford Currie http://c-dot.co.uk, &copy; 2002-2003, Eric Scouten., &copy;  2006 Martin Cleaver http://www.cleaver.org, &copy; 2001 Motorola. All Rights Reserved. "}%
 %META:FIELD{name="License" title="License" value="GPL ([[http://www.gnu.org/copyleft/gpl.html][GNU General Public License]])"}%
 %META:FIELD{name="Home" title="Home" value="Foswiki:Extensions/%25TOPIC%25"}%
 %META:FIELD{name="Support" title="Support" value="Foswiki:Support/%25TOPIC%25"}%

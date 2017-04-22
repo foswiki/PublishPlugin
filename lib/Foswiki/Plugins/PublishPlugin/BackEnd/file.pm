@@ -50,11 +50,9 @@ sub new {
     $this->{html_files} = [];
 
     if ( $params->{keep} ) {
-        print STDERR "SCANNING\n";
         $this->_scanExistingHTML( $this->{file_root}, '' );
     }
     else {
-        print STDERR "Expunging\n";
         File::Path::rmtree( $this->{file_root} );
     }
 

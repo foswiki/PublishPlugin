@@ -341,12 +341,6 @@ sub publish {
     my ( $header, $footer ) = ( '', '' );
     unless ( Foswiki::Func::getContext()->{command_line} ) {
 
-        # running from CGI
-        if ( defined $Foswiki::Plugins::SESSION->{response} ) {
-            $Foswiki::Plugins::SESSION->generateHTTPHeaders();
-            $Foswiki::Plugins::SESSION->{response}
-              ->print( CGI::start_html( -title => 'Foswiki: Publish' ) );
-        }
         ( $header, $footer ) =
           $this->_getPageTemplate( $Foswiki::cfg{SystemWebName} );
     }
@@ -453,7 +447,7 @@ TEXT
                 while ( my $twt = pop(@topics) ) {
                     ( $w, $t ) = split( /\./, $twt, 2 );
                     unless ( $twt =~ /^$wre\.$tre$/ ) {
-                        push( @filtered, $twt );
+                        unshift( @filtered, $twt );
                     }
                 }
                 @topics = @filtered;
@@ -498,7 +492,6 @@ TEXT
             @topics = grep { !/$re$/ } @topics;
         }
     }
-    print join( " ", @topics ) . "\n";
 
     # Choose template. Note that $template_TEMPLATE can still override
     # this in specific topics.

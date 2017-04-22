@@ -60,20 +60,16 @@ sub initPlugin {
     return 1;
 }
 
+our $headerSent = 0;
+
 sub _publishRESTHandler {
 
     require Foswiki::Plugins::PublishPlugin::Publisher;
     die $@ if $@;
 
-    my $query = Foswiki::Func::getCgiQuery();
+    $headerSent = 0;
 
-    # 'compress' undocumented but retained for compatibility
-    if ( $query && defined $query->param('compress') ) {
-        my $v = $query->param('compress');
-        if ( $v =~ /(\w+)/ ) {
-            $query->param( 'format', $1 );
-        }
-    }
+    my $query = Foswiki::Func::getCgiQuery();
 
     my $publisher = new Foswiki::Plugins::PublishPlugin::Publisher(
         $Foswiki::Plugins::SESSION);
@@ -84,9 +80,18 @@ sub _publishRESTHandler {
 
 sub _display {
     my $msg = join( '', @_ );
+
     if ( defined $Foswiki::Plugins::SESSION->{response}
         && !Foswiki::Func::getContext()->{command_line} )
     {
+        unless ($headerSent) {
+
+            # running from CGI
+            $Foswiki::Plugins::SESSION->generateHTTPHeaders();
+            $Foswiki::Plugins::SESSION->{response}
+              ->print( CGI::start_html( -title => 'Foswiki: Publish' ) );
+            $headerSent = 1;
+        }
         $Foswiki::Plugins::SESSION->{response}->print($msg);
     }
     else {
