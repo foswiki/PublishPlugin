@@ -29,7 +29,7 @@ when this may not be desirable, or even possible. For example:
    1 Foswiki is used to create documentation which has to be readable off-line
    1 Published versions of Foswiki pages must be read-only
    1 The Foswiki server is inaccessible to the audience (e.g. on the other side of a corporate firewall)
-   1 You want to put product documentation on a CD
+   1 You want an efficient, high-density snapshot of the wiki content
 
 To address these requirements the PublishPlugin supports the generation of several different document formats from Foswiki pages, including HTML and PDF.
 
@@ -41,10 +41,11 @@ To address these requirements the PublishPlugin supports the generation of sever
    * Any links to images outside the wiki are resolved, and the image is stored in the output (requires LWP)
    * Output in HTML or PDF
    * HTML can be compressed in different archive formats
+   * Incremental output of HTML for efficient incremental publishing
    * Full support for hierarchical webs
    * Format-specific skins (such as viewpdf) can be specified
    * Able to publish HTML and referenced files directly to a remote server via ftp
-   * Complete history of what was published, and when!
+   * Complete history of what was published, and when
    * Fully compatible with [[Foswiki:Extensions.BookmakerPlugin][BookmakerPlugin]]
 
 ---++ Usage
@@ -124,7 +125,7 @@ table.publishForm .paramCol {
           Topics
         </td>
         <td class="inputCol">
-          <input type="text" name="topics" class="foswikiInputField" value="%URLPARAM{"topics" default="" encode="entity"}%" size="30" title="Leave blank to publish all topics in the web"/>
+          <input type="text" name="topics" class="foswikiInputField" value="%URLPARAM{"topics" default="" encode="entity"}%" size="30"/>
         </td>
         <td class="infoCol">
 The =topics= parameter is used to give a (comma-separated) list of web.topic names. These can be specified using  [[#WildcardPattern][wildcard patterns]].
@@ -135,7 +136,9 @@ The =topics= parameter is used to give a (comma-separated) list of web.topic nam
    * The list is expanded in left-right order. You can edit the list at any point by prefixing an entry with a =-= sign e.g. =*.*,-*.Last*= will publish all topics in the wiki in web.topic order except topics starting with =Last=
    * You can use =-= to control the ordering; =*.*,-*.Last*,*.Last*= will do the same, but followed by all topics in the wiki starting with =Last=
    * If a topic is matched twice in the ordering, it will be published twice (this will be a no-operation for most types of output, but may be useful in PDF)
-   * The order in which web and topic names are expanded is defined by the locale collation.
+   * The order in which wildcards are expanded is defined by the locale collation.
+These topics are only the start points for publishing. Links to other topics
+in the wiki will automatically be followed, and those topics published as well.
         <td class="paramCol">
           =topics=
         </td>
@@ -215,7 +218,8 @@ default="basic_publish"}%.tmpl= is the template that will be used to
 generate the output. You can preview any topic in this skin simply by
 appending =?skin=%URLPARAM{"skin" default="basic_publish"}%= to the
 end of the view URL. Note that the standard =VIEW_TEMPLATE= template
-override still works when publishing.
+override still works when publishing (but only if the VIEW_TEMPLATE has
+some content).
 	      </td>
 	      <td class="paramCol">
 	        =publishskin=
@@ -230,10 +234,11 @@ override still works when publishing.
 Lets you define Foswiki [[PreferenceSettings][preferences]] that will
 be available for use in topics during this publishing run. Define
 preferences one per line, using the syntax
-	        =PREFERENCE=VALUE= - for example, <verbatim>
-                  TOOL_VERSION=3.14.15
-                  ISBN=1-56592-149-6
-                </verbatim>
+	        =PREFERENCE=VALUE= - for example,
+<verbatim>
+TOOL_VERSION=3.14.15
+ISBN=1-56592-149-6
+</verbatim>
 Preferences defined this way can be used in topics (including the
 history topic) like any other Foswiki preference.
 	      </td>
@@ -341,7 +346,7 @@ don't need a history.
       <tr>
         <td colspan=4>
           The plugin can use a number of different 'back ends' to generate output
-          in different formats. These are selected using the =format= paramater. Open the relevant tab below to select a format and set parameters.
+          in different formats. These are selected using the =format= parameter. Open the relevant tab below to select a format and set parameters.
         </td>
       </tr>
       <tr>
@@ -375,7 +380,9 @@ Publish this page
 </a>
 </verbatim>
 
+<!--
 <a class='foswikiPopUp' href='%SCRIPTURLPATH{"rest"}%/PublishPlugin/publish?%REVARG%;topics=%BASEWEB%.%BASETOPIC%;format=file' rel='nofollow'>(Try it)</a>
+-->
 
 #BookMaker
 ---+++ Using Bookmaker
@@ -399,13 +406,12 @@ published content.
 Just =cd= to the =bin= directory, and
 =perl rest /PublishPlugin/publish=. Parameters are passed as name=value pairs, for example:
 <verbatim>
-perl rest /PublishPlugin/publish webs=Book exclusions='Web*' format=file
-perl rest /PublishPlugin/publish webs=Book inclusions=WebBook format=pdf extras='--book --duplex --toclevels=5'
+perl rest /PublishPlugin/publish topics='System.*,-*.Web*' format=file
 </verbatim>
-The available parameter names are shown in the publish form above, in the last column. Where parameters take multiple values (e.g. =preferences=) then you can separate the values using semicolons.
+The available parameter names are shown in the publish form above.
 
 ---++ How-tos
----+++ Controlling which parts of a topic get published
+---+++ How to control which parts of a topic get published
 You can control what gets published from a topic using =%<nop>STARTPUBLISH%= and =%<nop>STOPPUBLISH%= control tags:
    * If =%<nop>STARTPUBLISH%= is the first control tag seen in the file, everything before it will be ignored.
    * Everything between =%<nop>STOPPUBLISH%= and the next =%<nop>STARTPUBLISH%= (or the end of the topic) will be ignored.
@@ -414,7 +420,7 @@ You can control what gets published from a topic using =%<nop>STARTPUBLISH%= and
 Another good trick is to set up a special "publishing" web. Create topics in the web that %INCLUDE the topics from *other* webs that you want to publish. You can use [[%SYSTEMWEB%.VarSTARTSECTION][STARTSECTION]] and [[%SYSTEMWEB%.VarENDSECTION][ENDSECTION]] to highlight what you want published. This way the "publishing" web gives you a view of exactly what will be in the published output, without the need for special publishing tags.
 
 #WildcardPattern
----+++ Using Wildcard Patterns
+---+++ How to use Wildcard Patterns
 A wildcard is a special string that you can put into a filename so that it matches a whole range of files:
 | *String* | *What  it does* | *Example* | *What the example matches* |
 | * | Matches any string, including an empty string. | =*Cheese*= | Every topic with "Cheese" somewhere in the name (but _not_ "cheese") |
@@ -434,7 +440,7 @@ Most formats generate a single file with a unique extension that identifies the 
 
 %X% The rendered data can get pretty big, and the publishing process itself puts a heavy load on the server, especially when using compression on large webs.
 
----+++ Generating a Publishing History
+---+++ How to generate a Publishing History
 Every time a web is published, then the results of that publishing step can be stored in a topic in the web, by setting the =history= parameter to the name of a topic. In order to publish a web, you have to be able to write to this topic. 
 
 If the selected publishing skin defines a [[SkinTemplates][skin template]] called =publish_history=, then that template will be used as the basis of the history topic. This (for example) allows you to use a template with a skin to define access controls for the history topic. The template can refer to a Foswiki macro =%<nop>PUBLISHING_HISTORY%= to get the expanded history. The =basic_publish= skin provides =templates/publish_history.basic_publish.tmpl= for this purpose.
@@ -442,8 +448,8 @@ If the selected publishing skin defines a [[SkinTemplates][skin template]] calle
 The history topic contains a list of all the parameters used, and the versions of the topics that were published, so it is very useful for tracking exactly what you publish. However it can grow very large, if (for example) you are updating a static site from the wiki content regularly.
 
 #PublishToTopic
----+++ Publishing to a Topic
-If you are using an on-disk file store, such as !PlainFile or one of the RCS stores, you can publish an attachment direct to a topic.
+---+++ How to attach the output to a Topic
+If you are using an on-disk file store, such as !PlainFile or one of the RCS stores, you can publish an attachment direct to an attachment on a topic.
 
 %X% Note that overwriting attachments this way is extremely dangerous, so this should only be done by experts! You have been warned. %X%
 
@@ -488,7 +494,8 @@ apply.
 %$DEPENDENCIES%
 
 ---++ Compatibility Notes for version 3.0
-   * The =compress= paramater has been removed.
+   * Only tested on Foswiki 2.0.
+   * The =compress= parameter has been removed.
    * The &lt;nopublish> tag has been removed.
    * The =templates= parameter has been removed. We couldn't find anyone who was using it. The =template= parameter provides a subset of it's functionality.
    * The =file= generator no longer deletes existing published content before publishing.

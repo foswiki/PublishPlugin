@@ -60,44 +60,18 @@ sub initPlugin {
     return 1;
 }
 
-our $headerSent = 0;
-
 sub _publishRESTHandler {
 
     require Foswiki::Plugins::PublishPlugin::Publisher;
     die $@ if $@;
 
-    $headerSent = 0;
-
     my $query = Foswiki::Func::getCgiQuery();
 
-    my $publisher = new Foswiki::Plugins::PublishPlugin::Publisher(
-        $Foswiki::Plugins::SESSION);
+    my $logger = sub {
 
-    $publisher->publish( sub { return $query->param( $_[0] ) } );
-    $publisher->finish();
-}
-
-sub _display {
-    my $msg = join( '', @_ );
-
-    if ( defined $Foswiki::Plugins::SESSION->{response}
-        && !Foswiki::Func::getContext()->{command_line} )
-    {
-        unless ($headerSent) {
-
-            # running from CGI
-            $Foswiki::Plugins::SESSION->generateHTTPHeaders();
-            $Foswiki::Plugins::SESSION->{response}
-              ->print( CGI::start_html( -title => 'Foswiki: Publish' ) );
-            $headerSent = 1;
-        }
-        $Foswiki::Plugins::SESSION->{response}->print($msg);
-    }
-    else {
-        if ( $msg =~ /foswikiAlert/ ) {
-            $msg = "*** $msg";
-        }
+        # Command-line logger
+        my $level = shift;
+        my $msg = join( '', @_ );
 
         # Strip HTML tags from command-line output
         $msg =~ s/<\/?[a-z]+[^>]*>/ /g;
@@ -108,8 +82,57 @@ sub _display {
             # decode entities
             $msg = HTML::Entities::decode_entities($msg);
         };
-        print Encode::encode_utf8($msg) . "\n";
+        $msg = Encode::encode_utf8($msg);
+        if ( $level eq 'error' ) {
+            print STDERR "ERROR ", $msg, "\n";
+        }
+        else {
+            if ( $level ne 'info' ) {
+                print "$level: ";
+            }
+            print $msg, "\n";
+        }
+    };
+
+    my $footer;
+    my $body = '';
+    if ( defined $Foswiki::Plugins::SESSION->{response}
+        && !Foswiki::Func::getContext()->{command_line} )
+    {
+        # running from CGI
+        # Generate the progress information screen (based on the view template)
+        my $tmpl = Foswiki::Func::readTemplate('view');
+        ( $body, $footer ) = split( /%TEXT%/, $tmpl );
+        $body .= "<noautolink>\n";
+        $logger = sub {
+            my $level = shift;
+            if ( $level eq 'error' ) {
+                print STDERR "ERROR ", @_, "\n";
+            }
+            if ( $level ne 'info' ) {
+                $body .= "$level: ";
+            }
+            $body .= join( '', @_ ) . " <br/>\n";
+        };
     }
+
+    my $publisher = new Foswiki::Plugins::PublishPlugin::Publisher(
+        $Foswiki::Plugins::SESSION, $logger );
+
+    $publisher->publish(
+        sub {
+            my $p = $query->param( $_[0] );
+            return Foswiki::Sandbox::untaintUnchecked($p);
+        }
+    );
+    $publisher->finish();
+
+    $body .= $footer if $footer;
+
+    $body = Foswiki::Func::expandCommonVariables($body);
+    $body = Foswiki::Func::renderText($body);
+
+    return $body;
 }
 
 # Allow manipulation of $Foswiki::cfg{Plugins}{PublishPlugin}{Dir}

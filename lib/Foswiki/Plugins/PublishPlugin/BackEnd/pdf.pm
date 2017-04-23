@@ -38,7 +38,7 @@ sub new {
 
     my $this = $class->SUPER::new( $params, $logger );
 
-    $this->{tempdir} = File::Temp::tempdir( CLEANUP => 1 );
+    $this->{file_root} = '/tmp/publish';   #File::Temp::tempdir( CLEANUP => 1 );
 
     $this->{pdf_path} = $this->{output_file};    # from superclass
     $this->{pdf_path} .= '.pdf' unless $this->{pdf_path} =~ /\.\w+$/;
@@ -57,23 +57,29 @@ sub param_schema {
     $base->{outfile}->{default} = 'pdf';
     delete $base->{googlefile};
     delete $base->{keep};
-    return $base;
+    return {
+        %$base,
+        extras => {
+            default   => '',
+            desc      => 'Extra parameters to pass to htmldoc',
+            validator => sub {
+                my ( $v, $k ) = @_;
+
+                # Sandbox takes care of escaping dodgy stuff in command
+                # lines.
+                return $v;
+              }
+        },
+        genopt => { renamed => 'extras' }
+    };
 }
 
-# Override Foswiki::Plugins::PublishPlugin::BackEnd::file
-sub addByteData {
-    my ( $this, $path, $data ) = @_;
-    my $file = join( '_', split( '/', $path ) );
-    my $fn = "$this->{tempdir}/$file";
-    my $fh;
-    unless ( open( $fh, '>', $fn ) ) {
-        $this->{logger}->logError("Failed to write $file:  $!");
-        return;
-    }
-    print $fh $data;
-    close($fh);
-    push( @{ $this->{html_files} }, $fn ) if $path =~ /\.html/;
-    return $path;
+sub validateCommandLineParams {
+    my ( $v, $k ) = @_;
+
+    # detect shell control chars
+    die "Invalid '$v' in $k" if $v =~ /[`\$#|>&]/;
+    return $v;
 }
 
 # Override Foswiki::Plugins::PublishPlugin::BackEnd::file
@@ -83,12 +89,15 @@ sub close {
     $ENV{HTMLDOC_DEBUG} = 1;    # see man htmldoc - goes to apache err log
     $ENV{HTMLDOC_NOCGI} = 1;    # see man htmldoc
 
+    my @flies = map { "$this->{file_root}/$_" } @{ $this->{html_files} };
+    my @extras = split( /\s+/, $this->{params}->{extras} || '' );
+
     my ( $data, $exit ) = Foswiki::Sandbox::sysCommand(
         undef,
         $Foswiki::cfg{Plugins}{PublishPlugin}{PDFCmd},
         FILE   => $this->{pdf_file},
-        FILES  => $this->{html_files},
-        EXTRAS => []
+        FILES  => \@flies,
+        EXTRAS => \@extras
     );
 
     # htmldoc fails a lot, so log rather than dying

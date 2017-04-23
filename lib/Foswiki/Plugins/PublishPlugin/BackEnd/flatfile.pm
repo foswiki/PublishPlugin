@@ -19,7 +19,7 @@ package Foswiki::Plugins::PublishPlugin::BackEnd::flatfile;
 use strict;
 
 use Foswiki::Plugins::PublishPlugin::BackEnd::file;
-our @ISA = ('Foswiki::Plugins::PublishPlugin::BackEnd');
+our @ISA = ('Foswiki::Plugins::PublishPlugin::BackEnd::file');
 
 use constant DESCRIPTION =>
 'Single HTML file containing all topics. Attachments (and external resources if =copyexternal is selected=) will be saved to a top level =_rsrc= directory next to the HTML file.';

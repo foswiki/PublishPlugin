@@ -7,183 +7,177 @@ use Foswiki;
 use Foswiki::Func;
 use Error ':try';
 use Assert;
-use Foswiki::Plugins::PublishPlugin::PageAssembler;
 use URI ();
 
 require Exporter;
 our @ISA       = qw(Exporter);
-our @EXPORT_OK = qw(validateList validateWord validateTopicNameOrNull
-  validateWebNameList validateTopicNameList validateRE validateFilename
-  validateRelPath);
+our @EXPORT_OK = qw(validateWord validateBoolean);
 
 # Parameters, passed to publish()
 my %PARAM_SCHEMA = (
-    allattachments => { desc => 'Publish All Attachments' },
-    copyexternal   => {
-        default => 1,
-        desc    => 'Copy Off-Wiki Resources'
+    allattachments => {
+        default   => 0,
+        desc      => 'Publish All Attachments',
+        validator => \&validateBoolean
+    },
+    copyexternal => {
+        default   => 0,
+        desc      => 'Copy Off-Wiki Resources',
+        validator => \&validateBoolean
     },
     enableplugins => {
 
         # Keep this list in sync with System.PublishPlugin
         default =>
 '-CommentPlugin,-EditRowPlugin,-EditTablePlugin,-NatEditPlugin,-SubscribePlugin,-TinyMCEPlugin,-UpdatesPlugin',
-        validator => \&validateList,
-        desc      => 'Enable Plugins'
+        validator => sub {
+            validateList( @_, \&validateWebTopicWildcard );
+        },
+        desc => 'Enable Plugins'
     },
-    exclusions => { desc => 'Topic Exclude Filter (deprecated, use =topics=)' },
-    format     => {
+    exclusions => {
+        desc      => 'Topic Exclude Filter (deprecated, use =topics=)',
+        validator => sub {
+            validateList( @_, \&validateWebTopicWildcard );
+          }
+    },
+    format => {
         default   => 'file',
         validator => \&validateWord,
         desc      => 'Output Generator'
     },
     history => {
-        default   => '',
-        validator => \&validateTopicNameOrNull,
+        validator => \&validateWebTopicWildcard,
         desc      => 'History Topic'
     },
-    inclusions => { desc => 'Topic Include Filter (deprecated, use =topics=)' },
+    inclusions => {
+        desc      => 'Topic Include Filter (deprecated, use =topics=)',
+        validator => sub {
+            validateList( @_, \&validateWebTopicWildcard );
+          }
+    },
     preferences => {
-        default => '',
-        desc    => 'Extra Preferences'
+        desc      => 'Extra Preferences',
+        validator => sub {
+            my ( $k, $v ) = @_;
+            _parsePreferences(
+                $v,
+                sub {
+                    my ( $pref, $val ) = @_;
+                    validateWord( $pref, $k );
+                }
+            );
+          }
     },
     publishskin => {
-        validator => \&validateList,
+        default   => 'basic_publish',
+        validator => \&validateWord,
         desc      => 'Publish Skin'
     },
     template => {
-        default => 'view',
-        desc    => 'Template to use for publishing'
+        default   => 'view',
+        desc      => 'Template to use for publishing',
+        validator => \&validateWord
     },
-    topiclist => { desc => 'Deprecated, use =topics=' },
-    topics    => {
-        default        => '',
+    topiclist => {
+        desc      => 'Deprecated, use =topics=',
+        validator => sub {
+            validateList( @_, \&validateWord );
+          }
+    },
+    topics => {
+        default        => '*.*',
         allowed_macros => 1,
-        desc           => 'Topics'
+        desc           => 'Topics',
+        validator      => sub {
+            validateList( @_, \&validateWebTopicWildcard );
+          }
     },
     rexclude => {
-        default   => '',
         validator => \&validateRE,
         desc      => 'Content Filter'
     },
     versions => {
-        validator => \&validateList,
+        validator => \&validateWebTopicName,
         desc      => 'Versions Topic'
     },
-    web => { desc => 'Deprecated, use =topics=' },
+    web => {
+        desc      => 'Deprecated, use =topics=',
+        validator => \&validateWord
+    },
 
     # Renamed options
     filter      => { renamed => 'rexclude' },
-    instance    => { renamed => 'relativedir' },
-    genopt      => { renamed => 'extras' },
     topicsearch => { renamed => 'rexclude' },
     skin        => { renamed => 'publishskin' }
 );
 
-sub validateRE {
-    my $v = shift;
-
-    # SMELL: do a much better job of this!
-    $v =~ /^(.*)$/;
-    return $1;
-}
-
 # Parameter validators
-sub validateDir {
-    my $v = shift;
-    if ( -d $v ) {
-        $v =~ /(.*)/;
-        return $1;
-    }
-    my $k = shift;
-    die "Invalid $k: '$v'";
-}
-
 sub validateList {
-    my $v = shift;
-    if ( $v =~ /^([\w,. ]*)$/ ) {
-        return $1;
-    }
-    my $k = shift;
-    die "Invalid $k: '$v'";
-}
-
-sub validateTopicNameList {
-    my ( $v, $k ) = @_;
-    my @ts;
+    my ( $v, $k, $fn ) = @_;
     foreach my $t ( split( /\s*,\s*/, $v ) ) {
-        push( @ts, validateTopicName( $t, $k ) );
+        &$fn( $t, $k );
     }
-    return join( ',', @ts );
+    return $v;
 }
 
-sub validateTopicNameOrNull {
-    return validateTopicName( $_[0] ) if $_[0];
-    return $_[0];
+sub validateBoolean {
+
+    # Allow undef, '', 1, 0
+    my ( $v, $k ) = @_;
+    if ($v) {
+        die "Invalid boolean '$v' in $k"
+          unless $v =~ /^(y(es)?|t(rue)?|1|on)$/i;
+    }
+    return $v ? 1 : 0;
 }
 
-sub validateTopicName {
-    my $v = shift;
-    unless ( defined &Foswiki::Func::isValidTopicName ) {
+sub validateRE {
+    my ( $v, $k ) = @_;
 
-        # Old code doesn't have this. Caveat emptor.
-        return Foswiki::Sandbox::untaintUnchecked($v);
-    }
-    if ( Foswiki::Func::isValidTopicName( $v, 1 ) ) {
-        return Foswiki::Sandbox::untaintUnchecked($v);
-    }
-    my $k = shift;
-    die "Invalid $k: '$v'";
+    my $re;
+    eval { $re = qr/$v/; };
+    die "Invalid regex '$v' in $k" if ($@);
+    return $v;
 }
 
-sub validateWebNameList {
-    my $v = shift;
-    return '' unless defined $v && $v ne '';
-    die "Invalid web name '$v'"
-      unless $Foswiki::Plugins::SESSION->webExists($v);
-    return Foswiki::Sandbox::untaintUnchecked($v);
+sub validateWebTopicWildcard {
+    my ( $v, $k ) = @_;
+
+    # Replace wildcard components with Xx to make a simple name
+    my $tv = $v;
+    $tv =~ s/[][*?]/Xx/g;
+    validateWebTopicName( $tv, $k );
+    return $v;
+}
+
+sub validateWebTopicName {
+    my ( $v, $k ) = @_;
+
+    my ( $w, $t );
+    if ( $v =~ /\./ ) {
+        ( $w, $t ) = split( $v, /\./, 2 );
+    }
+    else {
+        $t = $v;
+    }
+    if ( defined $t && $t ne '' ) {
+        die "Invalid topic '$v' in $k"
+          unless Foswiki::Func::isValidTopicName( $t, 1 );
+    }
+
+    if ( defined $w && $w ne '' ) {
+        $w =~ s/[][*?]/Xx/g;
+        die "Invalid web '$v' in $k"
+          unless Foswiki::Func::isValidWebName($w);
+    }
+    return $v;
 }
 
 sub validateWord {
-    my $v = shift;
-    if ( $v =~ /^(\w+)$/ ) {
-        return $1;
-    }
-    my $k = shift;
-    die "Invalid $k: '$v'";
-}
-
-sub validateFilenameList {
     my ( $v, $k ) = @_;
-    my @ts;
-    foreach my $t ( split( /\s*,\s*/, $v ) ) {
-        push( @ts, validateFilename( $t, $k ) );
-    }
-    return join( ',', @ts );
-}
-
-sub validateFilename {
-    my $v = shift;
-    if ( $v =~ /^([\w .]*)$/ ) {
-        return $1;
-    }
-    my $k = shift;
-    die "Invalid $k: '$v'";
-}
-
-sub validateRelPath {
-    my $v = shift;
-    return '' unless $v;
-    my $k = shift;
-    die ".. not permitted in $k" if $v =~ /(^|\/)\.\.(\/|$)/;
-    $v .= '/';
-    $v =~ s#//+#/#;
-    $v =~ s#^/##;
-    if ( $v =~ m#^(.*)$# ) {
-        my $d = $1;
-        return $d;
-    }
-    die "Invalid $k: '$v'";
+    die "Invalid word '$v' in $k" unless $v =~ /^(\w*)$/;
+    return $v;
 }
 
 # Create a parameter hash from a hash of key=>value, applying validators
@@ -229,8 +223,10 @@ sub _loadParams {
 
     my $format_prefix = ( &$data('format') // 'NONE' ) . '_';
 
-    while ( my ( $k, $spec ) = each %schema ) {
+    while ( my ( $ok, $spec ) = each %schema ) {
+
         my $v;
+        my $k = $ok;
 
         # map file_outfile to outfile
         if ( defined( &$data( $format_prefix . $k ) ) ) {
@@ -239,30 +235,38 @@ sub _loadParams {
         else {
             $v = &$data($k);
         }
-        if ( defined($v) ) {
 
-            while ( defined $spec->{renamed} ) {
-                $k    = $spec->{renamed};
-                $spec = $schema{$k};
-            }
-            if ( defined $spec->{allowed_macros} ) {
-                $v = Foswiki::Func::expandCommonVariables($v);
-            }
-            if ( defined $spec->{default} && $v eq $spec->{default} ) {
-                $opt{$k} = $spec->{default};
-            }
-            elsif ( defined $spec->{validator} ) {
-                $opt{$k} = &{ $spec->{validator} }( $v, $k );
-                $this->logInfo( $k, $v );
-            }
-            else {
-                $opt{$k} = $v;
-                $this->logInfo( $k, $v );
+        while ( defined $spec->{renamed} ) {
+            $k    = $spec->{renamed};
+            $spec = $schema{$k};
+        }
+        ASSERT( defined $spec->{validator}, $k ) if DEBUG;
+
+        if ( defined $spec->{default} ) {
+            if ( !defined $v ) {
+
+                #print STDERR "Default $ok to '$spec->{default}'\n";
+                $v = $spec->{default};
             }
         }
-        else {
-            $opt{$k} = $spec->{default};
+
+        if ( defined $spec->{allowed_macros} ) {
+            $v = Foswiki::Func::expandCommonVariables($v);
         }
+
+        $v = &{ $spec->{validator} }( $v, $k );
+
+        if (
+            (
+                  !defined $spec->{default} && defined $v
+                || defined $spec->{default} && $v ne $spec->{default}
+            )
+            && ( length( $spec->{default} ) != length($v) )
+          )
+        {
+            $this->logInfo("$ok = '$v'");
+        }
+        $opt{$k} = $v;
     }
     $this->{opt} = \%opt;
 }
@@ -307,11 +311,27 @@ sub _loadConfigTopic {
     return \%data;
 }
 
+# Parse preference settings from preferences= parameter
+sub _parsePreferences {
+    my ( $prefs, $callback ) = @_;
+    foreach my $setting ( split( /\n+/, $prefs ) ) {
+        if ( $setting =~ /^\s*(\w+)\s*=(.*)$/ ) {
+            &$callback( $1, $2 );
+        }
+    }
+}
+
 # Constructor
 sub new {
-    my ( $class, $session ) = @_;
+    my ( $class, $session, $logfn ) = @_;
 
-    my $this = bless( { session => $session }, $class );
+    my $this = bless(
+        {
+            session => $session,
+            logfn   => $logfn
+        },
+        $class
+    );
 
     return $this;
 }
@@ -319,7 +339,8 @@ sub new {
 # Shutdown
 sub finish {
     my $this = shift;
-    $this->{session} = undef;
+    $this->{generator} = undef;
+    $this->{session}   = undef;
 }
 
 # Convert wildcarded comma-separated list to a regex
@@ -336,14 +357,6 @@ sub publish {
     # don't add extra markup for topics we're not linking too
     # NEWTOPICLINKSYMBOL LINKTOOLTIPINFO
     $Foswiki::Plugins::SESSION->renderer()->{NEWLINKSYMBOL} = '';
-
-    # Generate the progress information screen (based on the view template)
-    my ( $header, $footer ) = ( '', '' );
-    unless ( Foswiki::Func::getContext()->{command_line} ) {
-
-        ( $header, $footer ) =
-          $this->_getPageTemplate( $Foswiki::cfg{SystemWebName} );
-    }
 
     # Handle =enableplugins=. We simply muddy-boots the foswiki config.
     if ( $this->{opts}->{enableplugins} ) {
@@ -376,8 +389,8 @@ sub publish {
         }
     }
 
-    $this->logInfo( 'Publisher', Foswiki::Func::getWikiName() );
-    $this->logInfo( 'Date',      Foswiki::Func::formatTime( time() ) );
+    $this->logInfo( "*Publisher:* ", Foswiki::Func::getWikiName() );
+    $this->logInfo( "*Date:* ",      Foswiki::Func::formatTime( time() ) );
     $this->_loadParams($params);
 
     $this->{opt}->{publishskin} ||=
@@ -409,14 +422,13 @@ TEXT
     # that only live as long as the request) these values will not persist.
     # They may also be overridden locally in topics.
     if ( defined $this->{opt}->{preferences} ) {
-        my $sep =
-          Foswiki::Func::getContext()->{command_line} ? qr/;/ : qr/\r?\n/;
-        foreach my $setting ( split( $sep, $this->{opt}->{preferences} ) ) {
-            if ( $setting =~ /^(\w+)\s*=(.*)$/ ) {
-                my ( $k, $v ) = ( $1, $2 );
+        _parsePreferences(
+            $this->{opt}->{preferences},
+            sub {
+                my ( $k, $v ) = @_;
                 Foswiki::Func::setPreferencesValue( $k, $v );
             }
-        }
+        );
     }
 
     # Start by making a total ordering of topics to be published
@@ -425,7 +437,8 @@ TEXT
     if ( $this->{opt}->{topics} ) {
 
         # Get a total list of webs (and subwebs)
-        my %webs = map { $_ => undef } Foswiki::Func::getListOfWebs();
+        my %webs = map { $_ => undef }
+          grep { !/^_/ } Foswiki::Func::getListOfWebs();
 
         my @wild = split( /\s*,\s*/, $this->{opt}->{topics} );
 
@@ -567,13 +580,13 @@ TEXT
     # Close archive
     my $endpoint = $this->{archive}->close();
     if ( Foswiki::Func::getContext()->{command_line} ) {
-        $this->logInfo( "Published to",
-            "$Foswiki::cfg{Plugins}{PublishPlugin}{Dir}/$endpoint" );
+        $endpoint = "$Foswiki::cfg{Plugins}{PublishPlugin}{Dir}/$endpoint";
     }
     else {
-        my $url = $Foswiki::cfg{Plugins}{PublishPlugin}{URL} . '/' . $endpoint;
-        $this->logInfo( "Published to", "<a href='$url'>$url</a>" );
+        my $u = $Foswiki::cfg{Plugins}{PublishPlugin}{URL} . '/' . $endpoint;
+        $endpoint = "<a href='$u'>$u</a>";
     }
+    $this->logInfo( "*Published to* ", $endpoint );
 
     if ( $this->{history} ) {
 
@@ -623,34 +636,6 @@ TEXT
             $this->{history}->[1], 'view' );
         $this->logInfo( "History saved in", "<a href='$url'>$url</a>" );
     }
-
-    Foswiki::Plugins::PublishPlugin::_display($footer);
-}
-
-# get a template for presenting output / interacting (*not* used
-# for published content)
-sub _getPageTemplate {
-    my ($this) = @_;
-
-    my $query = Foswiki::Func::getCgiQuery();
-    my $web   = $Foswiki::cfg{SystemWebName};
-    my $topic = 'PublishPlugin';
-    my $tmpl  = Foswiki::Func::readTemplate('view');
-
-    $tmpl =~ s/%META\{.*?\}%//g;
-    for my $tag (qw( REVTITLE REVARG REVISIONS MAXREV CURRREV )) {
-        $tmpl =~ s/%$tag%//g;
-    }
-    my ( $header, $footer ) = split( /%TEXT%/, $tmpl );
-    $header = Foswiki::Func::expandCommonVariables( $header, $topic, $web );
-    $header = Foswiki::Func::renderText( $header, $web );
-    $header =~ s/<nop>//go;
-    Foswiki::Func::writeHeader();
-    Foswiki::Plugins::PublishPlugin::_display $header;
-
-    $footer = Foswiki::Func::expandCommonVariables( $footer, $topic, $web );
-    $footer = Foswiki::Func::renderText( $footer, $web );
-    return ( $header, $footer );
 }
 
 # from http://perl.active-venture.com/pod/perlfaq4-dataarrays.html
@@ -669,33 +654,23 @@ sub arrayDiff {
 }
 
 sub logInfo {
-    my ( $this, $header, $body ) = @_;
-    $body ||= '';
-    if ($header) {
-        $header = CGI::b("$header: ");
-    }
-    else {
-        $header = '';
-    }
-    Foswiki::Plugins::PublishPlugin::_display( $header, $body, CGI::br() );
-    $this->{historyText} .= "$header$body%BR%\n"
+    my $this = shift;
+
+    &{ $this->{logfn} }( "info", @_ );
+    $this->{historyText} .= join( '', @_ ) . "%BR%\n"
       if ( $this->{opt}->{history} );
 }
 
 sub logWarn {
     my ( $this, $message ) = @_;
-    Foswiki::Plugins::PublishPlugin::_display(
-        CGI::span( { class => 'foswikiAlert' }, $message ) );
-    Foswiki::Plugins::PublishPlugin::_display( CGI::br() );
+    &{ $this->{logfn} }( "warn", @_ );
     $this->{historyText} .= "%ORANGE% *WARNING* $message %ENDCOLOR%%BR%\n"
       if ( $this->{opt}->{history} );
 }
 
 sub logError {
     my ( $this, $message ) = @_;
-    Foswiki::Plugins::PublishPlugin::_display(
-        CGI::span( { class => 'foswikiAlert' }, "ERROR: $message" ) );
-    Foswiki::Plugins::PublishPlugin::_display( CGI::br() );
+    &{ $this->{logfn} }( "error", @_ );
     $this->{historyText} .= "%RED% *ERROR* $message %ENDCOLOR%%BR%\n"
       if ( $this->{opt}->{history} );
 }
@@ -705,15 +680,15 @@ sub logError {
 sub _publishTopic {
     my ( $this, $web, $topic ) = @_;
 
-    my $tmpl = $this->{skin_template};
-
-    # Read topic data.
-    ( $web, $topic ) = Foswiki::Func::normalizeWebTopicName( $web, $topic );
-
     return
          if $this->{history}
       && $web   eq $this->{history}->[0]
       && $topic eq $this->{history}->[1];    # never publish this
+
+    if ( $this->{archive}->alreadyPublished( $web, $topic ) ) {
+        $this->logInfo( "$web.$topic", ' is already up to date' );
+        return;
+    }
 
     # SMELL: Nasty. Should fix Item13387.
     if ( defined &Foswiki::Plugins::TablePlugin::initialiseWhenRender ) {
@@ -758,6 +733,22 @@ sub _publishTopic {
         Foswiki::Func::getContext()->{"${plugin}Enabled"} = $enable;
     }
 
+    # re-init enabled plugins
+    foreach my $plugin ( %{ $Foswiki::cfg{Plugins} } ) {
+        next
+          unless ref( $Foswiki::cfg{Plugins}{$plugin} )
+          && $Foswiki::cfg{Plugins}{$plugin}{Module};
+        my $module = $Foswiki::cfg{Plugins}{$plugin}{Module};
+        my $initfn = $module . '::initPlugin';
+        if ( defined &$initfn ) {
+            eval {
+                no strict 'refs';
+                &$initfn( $topic, $web, Foswiki::Func::getWikiName(), $web );
+                use strict 'refs';
+            };
+        }
+    }
+
     # Because of Item5388, we have to re-read the topic to get the
     # right session in the $meta. This could be done by patching the
     # $meta object, but this should be longer-lasting.
@@ -767,14 +758,22 @@ sub _publishTopic {
 
     $Foswiki::Plugins::SESSION->enterContext( 'can_render_meta', $meta );
 
+    my $tmpl = $this->{skin_template};
+
     # Allow a local definition of VIEW_TEMPLATE to override the
     # template passed in (unless this is disabled by a global option)
     my $override = Foswiki::Func::getPreferencesValue('VIEW_TEMPLATE');
     if ($override) {
-        $tmpl =
+        my $alt_tmpl =
           Foswiki::Func::readTemplate( $override, $this->{opt}->{publishskin},
             $web );
-        $this->logInfo( "$web.$topic", "has a VIEW_TEMPLATE '$override'" );
+        $this->logInfo( "$web.$topic", " has a VIEW_TEMPLATE '$override'" );
+        if ( length($alt_tmpl) ) {
+            $tmpl = $alt_tmpl;
+        }
+        else {
+            $this->logWarn("The VIEW_TEMPLATE is empty - ignoring");
+        }
     }
 
     my ( $revdate, $revuser, $maxrev );
@@ -784,8 +783,6 @@ sub _publishTopic {
     }
 
     # Expand and render the topic text
-    $text = Foswiki::Func::expandCommonVariables( $text, $topic, $web, $meta );
-
     my $newText = '';
     my $tagSeen = 0;
     my $publish = 1;
@@ -824,8 +821,15 @@ sub _publishTopic {
 
     $tmpl = Foswiki::Func::renderText( $tmpl, $web, $topic );
 
-    $tmpl = Foswiki::Plugins::PublishPlugin::PageAssembler::assemblePage( $this,
-        $tmpl );
+    if ( $Foswiki::Plugins::SESSION->can("_renderZones") ) {
+
+        # Foswiki 1.1 up to 2.0
+        $tmpl = $Foswiki::Plugins::SESSION->_renderZones($tmpl);
+    }
+    else {
+        # Foswiki 2.1 and later
+        $tmpl = $Foswiki::Plugins::SESSION->zones()->_renderZones($tmpl);
+    }
 
     if ( $Foswiki::Plugins::VERSION and $Foswiki::Plugins::VERSION >= 2.0 )
     {
@@ -901,7 +905,7 @@ s/<blockquote [^]*\bcite=[^>]*>/$this->_rewriteTag($&, 'cite', $web, $topic)/gei
         $Foswiki::Plugins::SESSION = $old{SESSION};    # restore session
     }
 
-    $this->logInfo( "$web.$topic", "version $publishRev published" );
+    $this->logInfo("$web.$topic version $publishRev published");
 
     return $publishRev;
 }

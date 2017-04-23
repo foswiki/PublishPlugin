@@ -23,7 +23,9 @@ package Foswiki::Plugins::PublishPlugin::BackEnd::ftp;
 
 use strict;
 
-use Foswiki::Plugins::PublishPlugin::BackEnd::file;
+use Foswiki::Plugins::PublishPlugin::Publisher qw(validateWord validateBoolean);
+use Foswiki::Plugins::PublishPlugin::BackEnd::file
+  qw(validatePath validateHost);
 our @ISA = ('Foswiki::Plugins::PublishPlugin::BackEnd::file');
 
 use constant DESCRIPTION =>
@@ -57,16 +59,27 @@ sub new {
 sub param_schema {
     my $class = shift;
     my $base  = {
-        destinationftpserver =>
-          { desc => 'Server host name e.g. some.host.name' },
-        destinationftppath =>
-          { desc => 'Root path on the server to upload to' },
-        destinationftpusername => { desc => 'FTP server username' },
-        destinationftppassword => { desc => 'FTP server password' },
-        fastupload             => {
+        destinationftpserver => {
+            desc      => 'Server host name e.g. some.host.name',
+            validator => \&validateHost
+        },
+        destinationftppath => {
+            desc      => 'Root path on the server to upload to',
+            validator => \&validatePath
+        },
+        destinationftpusername => {
+            desc      => 'FTP server username',
+            validator => \&validateWord
+        },
+        destinationftppassword => {
+            desc      => 'FTP server password',
+            validator => sub { return $_[0]; }
+        },
+        fastupload => {
             desc =>
 'Speed up the ftp publishing by only uploading modified files. This will store a (tiny) checksum (.md5) file on the server alongside each uploaded file which will be used to optimise future uploads. Recommended.',
-            default => 1
+            default   => 1,
+            validator => \&validateBoolean
         },
         %{ $class->SUPER::param_schema() }
     };

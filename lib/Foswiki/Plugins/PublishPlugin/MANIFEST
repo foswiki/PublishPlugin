@@ -4,7 +4,6 @@ data/System/PublishWeb.txt 0644
 lib/Foswiki/Plugins/PublishPlugin.pm 0444
 lib/Foswiki/Plugins/PublishPlugin/Config.spec 0444
 lib/Foswiki/Plugins/PublishPlugin/Publisher.pm 0444
-lib/Foswiki/Plugins/PublishPlugin/PageAssembler.pm 0444
 lib/Foswiki/Plugins/PublishPlugin/BackEnd.pm 0444
 lib/Foswiki/Plugins/PublishPlugin/BackEnd/file.pm 0444
 lib/Foswiki/Plugins/PublishPlugin/BackEnd/flatfile.pm 0444

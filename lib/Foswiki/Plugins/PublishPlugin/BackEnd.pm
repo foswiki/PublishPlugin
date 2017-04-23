@@ -93,6 +93,7 @@ sub describeParams {
     my $entry;
     foreach my $p ( sort keys %$ps ) {
         my $spec = $ps->{$p};
+        next if $spec->{renamed};
         $entry = $template;
         $entry =~ s/\$pname/$p/g;
         $entry =~ s/\$phelp/$spec->{desc} || ''/ge;
@@ -101,6 +102,20 @@ sub describeParams {
         push( @entries, $entry );
     }
     return join( $sep, @entries );
+}
+
+=begin TML
+
+---++ ObjectMethod alreadyPublished( $web, $topic, $date ) -> $bool
+
+Test if the given topic, which has the given date in the store, has
+already been published. A true return value will cause the topic to
+be skipped in this publishing step.
+
+=cut
+
+sub alreadyPublished {
+    return 0;
 }
 
 =begin TML

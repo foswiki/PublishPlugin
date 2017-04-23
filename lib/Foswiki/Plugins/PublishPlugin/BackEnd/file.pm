@@ -21,14 +21,15 @@ package Foswiki::Plugins::PublishPlugin::BackEnd::file;
 use strict;
 
 use Foswiki::Plugins::PublishPlugin::BackEnd;
-our @ISA = ('Foswiki::Plugins::PublishPlugin::BackEnd');
+require Exporter;
+our @ISA       = qw(Foswiki::Plugins::PublishPlugin::BackEnd Exporter);
+our @EXPORT_OK = qw(validateHost validatePath);
 
 use File::Copy ();
 use File::Path ();
-use Foswiki::Plugins::PublishPlugin::Publisher
-  qw(validateFilename validateRelPath);
+
 use constant DESCRIPTION =>
-"Generates a directory tree on the server containing an HTML file for each topic, and copies of all published attachments. If you have selected =copyexternal=, then copied resources will be stored in a top level =_rsrc= directory. %X% since April 2017 publishing is _incremental_ - it will not delete existing content. You need to do that yourself if you want to. Be careful that moved topics and attachments may end up remaining in published content if you don't.";
+"Generates a directory tree on the server containing an HTML file for each topic, and copies of all published attachments. If you have selected =copyexternal=, then copied resources will be stored in a top level =_rsrc= directory.";
 
 sub new {
     my ( $class, $params, $logger ) = @_;
@@ -46,14 +47,20 @@ sub new {
 
     $this->{resource_id} = 0;
 
+    $this->{last_published} = {};
+
     # Capture HTML generated for use by subclasses
     $this->{html_files} = [];
 
-    if ( $params->{keep} ) {
-        $this->_scanExistingHTML( $this->{file_root}, '' );
-    }
-    else {
+    if ( !$params->{keep} || $params->{keep} eq 'nothing' ) {
+
+        # Don't keep anything
         File::Path::rmtree( $this->{file_root} );
+    }
+    elsif ( !$params->{dont_keep_existing} ) {
+
+        # See what's worth keeping
+        $this->_scanExistingHTML( $this->{file_root}, '' );
     }
 
     return $this;
@@ -62,20 +69,46 @@ sub new {
 # Find existing HTML in published dir structure to add to sitemap etc
 sub _scanExistingHTML {
     my ( $this, $root, $relpath ) = @_;
-
     my $d;
     return unless ( opendir( $d, "$root/$relpath" ) );
     while ( my $f = readdir($d) ) {
         next if $f =~ /^\./;
-        if ( -d "$root$relpath/$f" ) {
+        if ( -d "$root/$relpath/$f" ) {
             $this->_scanExistingHTML( $root, $relpath ? "$relpath/$f" : $f );
         }
         elsif ( $relpath && $f =~ /\.html$/ ) {
-            push( @{ $this->{html_files} },
-                Encode::decode_utf8("$relpath/$f") );
+            my $p = "$relpath/$f";
+            push( @{ $this->{html_files} }, Encode::decode_utf8($p) );
+            $this->{last_published}->{$p} = ( stat("$root/$p") )[9];
         }
     }
     closedir($d);
+}
+
+# Validate a filename (not ..)
+sub validateFilename {
+    my ( $v, $k ) = @_;
+
+    return $v unless length($v);
+    die "invalid filename for $k: $_"
+      if $v eq '..' || $v =~ /[\/|\r\n\t\013*"?<:>]/;
+    return $v;
+}
+
+sub validateHost {
+    my ( $v, $k ) = @_;
+    die "Invalid host '$v' in $k"
+      unless $v =~
+/^(((([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]))|(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9]))$/;
+    return $v;
+}
+
+# Validate a path with no .. components
+sub validatePath {
+    my ( $v, $k ) = @_;
+    die "$k cannot start with /" if $v =~ /^\//;
+    map { validateFilename( $_, $k ) } split( /\/+/, $v );
+    return $v;
 }
 
 # Implement  Foswiki::Plugins::PublishPlugin::BackEnd
@@ -99,13 +132,21 @@ sub param_schema {
             desc =>
 'Additional path components to put above the top of the published output. See [[%SYSTEMWEB%.PublishPlugin#PublishToTopic][here]] for one way this can be used.',
             default   => '',
-            validator => \&validateRelPath,
+            validator => \&validatePath
         },
         keep => {
-            default => 0,
+            default => 'nothing',
             desc =>
-"Enable to keep previously published topics. The default is to clear down the output each time it is published."
-        }
+"Set to =unchanged= to publish only those topics that have changed in the store since they were last published. Set to =unselected= to republish all selected topics, but also keep previously published topics in the output area that were not selected for publishing this time. Set to =nothing= to clear down the output before each time it is published. Does not work with =versions=.",
+            validator => sub {
+                my ( $v, $k ) = @_;
+                die "Invalid keep '$v' in $k"
+                  if $v
+                  && $v !~ /^(nothing|unselected|unchanged)$/;
+                return $v;
+              }
+        },
+        instance => { renamed => 'relativedir' }
     };
 }
 
@@ -115,6 +156,17 @@ sub getTopicPath {
     my @path = split( /\/+/, $web );
     push( @path,, $topic . '.html' );
     return $this->pathJoin(@path);
+}
+
+# Implement  Foswiki::Plugins::PublishPlugin::BackEnd
+sub alreadyPublished {
+    my ( $this, $web, $topic ) = @_;
+    return 0 unless ( $this->{params}->{keep} // '' ) eq 'unchanged';
+    my $pd = $this->{last_published}->{"$web/$topic.html"};
+    return 0 unless $pd;
+    my ($cd) = Foswiki::Func::getRevisionInfo( $web, $topic );
+    return 0 unless $cd;
+    return $cd <= $pd;
 }
 
 # Implement  Foswiki::Plugins::PublishPlugin::BackEnd
