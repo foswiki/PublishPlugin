@@ -416,6 +416,7 @@ You can control what gets published from a topic using =%<nop>STARTPUBLISH%= and
    * If =%<nop>STARTPUBLISH%= is the first control tag seen in the file, everything before it will be ignored.
    * Everything between =%<nop>STOPPUBLISH%= and the next =%<nop>STARTPUBLISH%= (or the end of the topic) will be ignored.
    * =%<nop>STARTPUBLISH%= and =%<nop>STOPPUBLISH%= will be visible in the viewed topic, so you can easily see what will be published from the topic.
+      * If you don't want to see the tags in normal view, then just define global preferences STARTPUBLISH and STOPPUBLISH using =Set=. Set them to the empty string. That won't stop them being interpreted by the plugin, but will make them invisible in normal view.
 
 Another good trick is to set up a special "publishing" web. Create topics in the web that %INCLUDE the topics from *other* webs that you want to publish. You can use [[%SYSTEMWEB%.VarSTARTSECTION][STARTSECTION]] and [[%SYSTEMWEB%.VarENDSECTION][ENDSECTION]] to highlight what you want published. This way the "publishing" web gives you a view of exactly what will be in the published output, without the need for special publishing tags.
 
