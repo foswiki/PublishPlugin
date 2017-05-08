@@ -653,26 +653,32 @@ sub arrayDiff {
     return @difference;
 }
 
+sub _log {
+    my $this = shift;
+    my $level = shift;
+    my $preamble = shift;
+
+    &{ $this->{logfn} }( $level, @_ );
+    $this->{historyText} .=
+        join( '', $preamble, @_,
+              ($preamble ? '%ENDCOLOR$' : ''),
+              '%BR%\n')
+      if ( $this->{opt}->{history} );
+}
+
 sub logInfo {
     my $this = shift;
-
-    &{ $this->{logfn} }( "info", @_ );
-    $this->{historyText} .= join( '', @_ ) . "%BR%\n"
-      if ( $this->{opt}->{history} );
+    $this->_log('info', '', @_);
 }
 
 sub logWarn {
-    my ( $this, $message ) = @_;
-    &{ $this->{logfn} }( "warn", @_ );
-    $this->{historyText} .= "%ORANGE% *WARNING* $message %ENDCOLOR%%BR%\n"
-      if ( $this->{opt}->{history} );
+    my $this = shift;
+    $this->_log( 'warn', '%ORANGE% *WARNING* ', @_ );
 }
 
 sub logError {
-    my ( $this, $message ) = @_;
-    &{ $this->{logfn} }( "error", @_ );
-    $this->{historyText} .= "%RED% *ERROR* $message %ENDCOLOR%%BR%\n"
-      if ( $this->{opt}->{history} );
+    my $this = shift;
+    $this->_log( 'error', '%RED% *ERROR* ', @_ );
 }
 
 #  Publish one topic from web.
@@ -772,7 +778,10 @@ sub _publishTopic {
             $tmpl = $alt_tmpl;
         }
         else {
-            $this->logWarn("The VIEW_TEMPLATE is empty - ignoring");
+            $this->logWarn("The VIEW_TEMPLATE '", $override,
+                           "' is empty for skin ",
+                           $this->{opt}->{publishskin},
+                           "- ignoring");
         }
     }
 
