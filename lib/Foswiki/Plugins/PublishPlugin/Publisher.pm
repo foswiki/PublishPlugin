@@ -115,6 +115,9 @@ my %PARAM_SCHEMA = (
 # Parameter validators
 sub validateList {
     my ( $v, $k, $fn ) = @_;
+
+    return undef unless defined $v;
+
     foreach my $t ( split( /\s*,\s*/, $v ) ) {
         &$fn( $t, $k );
     }
@@ -135,6 +138,8 @@ sub validateBoolean {
 sub validateRE {
     my ( $v, $k ) = @_;
 
+    return undef unless defined $v;
+
     my $re;
     eval { $re = qr/$v/; };
     die "Invalid regex '$v' in $k" if ($@);
@@ -143,6 +148,8 @@ sub validateRE {
 
 sub validateWebTopicWildcard {
     my ( $v, $k ) = @_;
+
+    return undef unless defined $v;
 
     # Replace wildcard components with Xx to make a simple name
     my $tv = $v;
@@ -154,9 +161,11 @@ sub validateWebTopicWildcard {
 sub validateWebTopicName {
     my ( $v, $k ) = @_;
 
+    return undef unless defined $v;
+
     my ( $w, $t );
     if ( $v =~ /\./ ) {
-        ( $w, $t ) = split( $v, /\./, 2 );
+        ( $w, $t ) = split( /\./, $v, 2 );
     }
     else {
         $t = $v;
@@ -176,6 +185,9 @@ sub validateWebTopicName {
 
 sub validateWord {
     my ( $v, $k ) = @_;
+
+    return undef unless defined $v;
+
     die "Invalid word '$v' in $k" unless $v =~ /^(\w*)$/;
     return $v;
 }
@@ -223,10 +235,12 @@ sub _loadParams {
 
     my $format_prefix = ( &$data('format') // 'NONE' ) . '_';
 
-    while ( my ( $ok, $spec ) = each %schema ) {
+    # Sort to make it deterministic
+    foreach my $ok ( sort keys %schema ) {
 
         my $v;
-        my $k = $ok;
+        my $k    = $ok;
+        my $spec = $schema{$k};
 
         # map file_outfile to outfile
         if ( defined( &$data( $format_prefix . $k ) ) ) {
@@ -236,19 +250,27 @@ sub _loadParams {
             $v = &$data($k);
         }
 
+        my $renamed = 0;
         while ( defined $spec->{renamed} ) {
-            $k    = $spec->{renamed};
-            $spec = $schema{$k};
+            $k       = $spec->{renamed};
+            $spec    = $schema{$k};
+            $renamed = 1;
         }
+
+        next if defined $opt{$k};
+
         ASSERT( defined $spec->{validator}, $k ) if DEBUG;
 
-        if ( defined $spec->{default} ) {
-            if ( !defined $v ) {
+        if ( !defined $v && defined $spec->{default} ) {
 
-                #print STDERR "Default $ok to '$spec->{default}'\n";
-                $v = $spec->{default};
-            }
+            #print STDERR "Default $ok to '$spec->{default}'\n";
+            $v = $spec->{default};
         }
+        elsif ( defined $v ) {
+            $this->logInfo("$ok = '$v'");
+        }
+
+        next unless defined $v;
 
         if ( defined $spec->{allowed_macros} ) {
             $v = Foswiki::Func::expandCommonVariables($v);
@@ -256,16 +278,6 @@ sub _loadParams {
 
         $v = &{ $spec->{validator} }( $v, $k );
 
-        if (
-            (
-                  !defined $spec->{default} && defined $v
-                || defined $spec->{default} && $v ne $spec->{default}
-            )
-            && ( length( $spec->{default} ) != length($v) )
-          )
-        {
-            $this->logInfo("$ok = '$v'");
-        }
         $opt{$k} = $v;
     }
     $this->{opt} = \%opt;
@@ -654,21 +666,19 @@ sub arrayDiff {
 }
 
 sub _log {
-    my $this = shift;
-    my $level = shift;
+    my $this     = shift;
+    my $level    = shift;
     my $preamble = shift;
 
     &{ $this->{logfn} }( $level, @_ );
     $this->{historyText} .=
-        join( '', $preamble, @_,
-              ($preamble ? '%ENDCOLOR$' : ''),
-              '%BR%\n')
+      join( '', $preamble, @_, ( $preamble ? '%ENDCOLOR$' : '' ), '%BR%\n' )
       if ( $this->{opt}->{history} );
 }
 
 sub logInfo {
     my $this = shift;
-    $this->_log('info', '', @_);
+    $this->_log( 'info', '', @_ );
 }
 
 sub logWarn {
@@ -778,10 +788,13 @@ sub _publishTopic {
             $tmpl = $alt_tmpl;
         }
         else {
-            $this->logWarn("The VIEW_TEMPLATE '", $override,
-                           "' is empty for skin ",
-                           $this->{opt}->{publishskin},
-                           "- ignoring");
+            $this->logWarn(
+                "The VIEW_TEMPLATE '",
+                $override,
+                "' is empty for skin ",
+                $this->{opt}->{publishskin},
+                "- ignoring"
+            );
         }
     }
 
@@ -893,25 +906,18 @@ s/<blockquote [^]*\bcite=[^>]*>/$this->_rewriteTag($&, 'cite', $web, $topic)/gei
         }
     }
 
-    if ( defined &Foswiki::Func::popTopicContext ) {
-        Foswiki::Func::popTopicContext();
-        if ( defined $Foswiki::Plugins::SESSION->{SESSION_TAGS} ) {
+    Foswiki::Func::popTopicContext();
+    if ( defined $Foswiki::Plugins::SESSION->{SESSION_TAGS} ) {
 
-            # In 1.0.6 and earlier, have to handle some session tags ourselves
-            # because pushTopicContext doesn't do it. **
-            foreach my $macro (
-                qw(BASEWEB BASETOPIC
-                INCLUDINGWEB INCLUDINGTOPIC)
-              )
-            {
-                $Foswiki::Plugins::SESSION->{SESSION_TAGS}{$macro} =
-                  $old{$macro};
-            }
+        # In 1.0.6 and earlier, have to handle some session tags ourselves
+        # because pushTopicContext doesn't do it. **
+        foreach my $macro (
+            qw(BASEWEB BASETOPIC
+            INCLUDINGWEB INCLUDINGTOPIC)
+          )
+        {
+            $Foswiki::Plugins::SESSION->{SESSION_TAGS}{$macro} = $old{$macro};
         }
-
-    }
-    else {
-        $Foswiki::Plugins::SESSION = $old{SESSION};    # restore session
     }
 
     $this->logInfo("$web.$topic version $publishRev published");
@@ -953,7 +959,7 @@ sub _rewriteTag {
 sub _processURL {
     my ( $this, $url ) = @_;
 
-    my $url = URI->new($url);
+    $url = URI->new($url);
 
     # $url->scheme
     # $url->user
