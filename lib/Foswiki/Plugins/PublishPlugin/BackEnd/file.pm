@@ -231,7 +231,12 @@ sub addByteData {
         $this->{logger}->logError("Failed to write $fn:  $!");
         return;
     }
-    print $fh $data;
+    if ( defined $data ) {
+        print $fh $data;
+    }
+    else {
+        $this->{logger}->logError("$fn has no data, empty file created");
+    }
     close($fh);
     $this->{logger}->logInfo( '', 'Published ' . $file );
     return $file;
