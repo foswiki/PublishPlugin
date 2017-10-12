@@ -176,9 +176,11 @@ sub validateWebTopicName {
     }
 
     if ( defined $w && $w ne '' ) {
-        $w =~ s/[][*?]/Xx/g;
+        my $xx = $w;
+        $xx =~ s/[][*?]/Xx/g;
+        $xx =~ s/^-//;
         die "Invalid web '$v' in $k"
-          unless Foswiki::Func::isValidWebName($w);
+          unless Foswiki::Func::isValidWebName($xx);
     }
     return $v;
 }
@@ -205,7 +207,7 @@ sub _loadParams {
     if ( &$data('configtopic') ) {
         my ( $cw, $ct ) =
           Foswiki::Func::normalizeWebTopicName( $Foswiki::cfg{UsersWebName},
-            $data->{config_topic} );
+            &$data->{config_topic} );
         my $d = _loadConfigTopic( $cw, $ct );
         $data = sub { return $d->{ $_[0] }; };
     }
@@ -956,6 +958,8 @@ sub _rewriteTag {
 
 # Rewrite a URL - be it internal or external. Internal URLs that point to
 # anything in pub, or to scripts, are always rewritten.
+my $noisy = 0;
+
 sub _processURL {
     my ( $this, $url ) = @_;
 
@@ -971,12 +975,13 @@ sub _processURL {
     # $url->equery
     # $url->frag
 
-    #print STDERR "Process $url\n";
-    if ( !defined $url->path() || $url->path() eq '' ) {
+    if ( !defined $url->path() || length( $url->path() ) == 0 ) {
 
-        #print STDERR "- no path\n";
+        print STDERR "- no path\n" if $noisy;
+
         # is there a frag?
         if ( $url->can('fragment') && $url->fragment ) {
+            print STDERR "- frag " . $url->fragment . "\n" if $noisy;
             return '#' . $url->fragment();
         }
 
@@ -996,32 +1001,63 @@ sub _processURL {
     sub _match {
         my ( $abs, $url, $match ) = @_;
 
+        print STDERR "Test $url against $match\n" if $noisy;
+
         # Some older parsers used to allow the scheme name to be present
         # in the relative URL if it was the same as the base URL
         # scheme. RFC1808 says that this should be avoided, so we assume
         # it's not so, and if there's a scheme, it's absolute.
-        if ( $match->can('scheme') ) {
-            return undef
-              unless ( $url->can('scheme') )
-              && _matchPart( $url->scheme, $match->scheme );
+        if ( $match->can('scheme') && $match->scheme ) {
+            if ( $url->can('scheme') ) {
+                unless ( _matchPart( $url->scheme, $match->scheme ) ) {
+                    print STDERR "- scheme mismatch "
+                      . $url->scheme . " and "
+                      . $match->scheme . "\n"
+                      if $noisy;
+                    return undef;
+                }
+            }
+            else {
+                print STDERR "- no scheme on url\n" if $noisy;
+                return undef;
+            }
         }
-        elsif ( $url->can('scheme') ) {
+        elsif ( $url->can('scheme') && $url->scheme ) {
+            print STDERR "- no scheme on match\n" if $noisy;
             return undef;
         }
-        if ( $match->can('host') ) {
-            return undef
-              unless $url->can('host')
-              && _matchPart( $url->host, $match->host );
+
+        if ( $match->can('host') && $match->host ) {
+            if ( $url->can('host') ) {
+                unless ( _matchPart( $url->host, $match->host ) ) {
+                    print STDERR "- host mismatch\n" if $noisy;
+                    return undef;
+                }
+            }
+            else {
+                print STDERR "- no host on url\n" if $noisy;
+                return undef;
+            }
         }
-        elsif ( $url->can('host') ) {
+        elsif ( $url->can('host') && $url->host ) {
+            print STDERR "- no host on match\n" if $noisy;
             return undef;
         }
-        if ( $match->can('port') ) {
-            return undef
-              unless $url->can('port')
-              && _matchPart( $url->port, $match->port );
+
+        if ( $match->can('port') && length( $match->port ) ) {
+            if ( $url->can('port') ) {
+                unless ( _matchPart( $url->port, $match->port ) ) {
+                    print STDERR "- port mismatch\n" if $noisy;
+                    return undef;
+                }
+            }
+            else {
+                print STDERR "- no port on url\n" if $noisy;
+                return undef;
+            }
         }
-        elsif ( $url->can('port') ) {
+        elsif ( $url->can('port') && length( $url->port ) ) {
+            print STDERR "- no port on match\n" if $noisy;
             return undef;
         }
 
@@ -1034,12 +1070,18 @@ sub _processURL {
                 || $mpath[0] eq 'SCRIPT' )
           )
         {
-            #print STDERR "- trim $upath[0] match $mpath[0]\n";
+            print STDERR "- trim $upath[0] match $mpath[0]\n" if $noisy;
             shift(@mpath);
             shift(@upath);
         }
-        return \@upath if $mpath[0] eq 'WEB';
-        return undef;
+        if ( $mpath[0] eq 'WEB' ) {
+            print STDERR "- matched " . join( '/', @upath ) . "\n" if $noisy;
+            return \@upath;
+        }
+        else {
+            print STDERR "- no match at $mpath[0]\n" if $noisy;
+            return undef;
+        }
     }
 
     # Is this local?
@@ -1049,7 +1091,7 @@ sub _processURL {
                 Foswiki::Func::getScriptUrlPath( 'WEB', 'TOPIC', 'SCRIPT' )
             ),
             script_abs => URI->new(
-                Foswiki::Func::getScriptUrlPath( 'WEB', 'TOPIC', 'SCRIPT' )
+                Foswiki::Func::getScriptUrl( 'WEB', 'TOPIC', 'SCRIPT' )
             ),
             pub_rel => URI->new(
                 Foswiki::Func::getPubUrlPath( 'WEB', 'TOPIC', 'ATTACHMENT' )
@@ -1063,20 +1105,30 @@ sub _processURL {
     }
 
     my ( $is_script, $is_pub, $upath ) = ( 0, 0 );
-    if ( $upath = _match( 1, $url, $this->{url_paths}->{script_abs} ) ) {
-        $is_script = 1;
-    }
-    elsif ( $upath = _match( 1, $url, $this->{url_paths}->{pub_abs} ) ) {
+    if ( $upath = _match( 1, $url, $this->{url_paths}->{pub_abs} ) ) {
+        print STDERR "- matched pub_abs at " . join( '/', @$upath ) . "\n"
+          if $noisy;
         $is_pub = 1;
-    }
-    elsif ( $upath = _match( 0, $url, $this->{url_paths}->{script_rel} ) ) {
-        $is_script = 1;
     }
     elsif ( $upath = _match( 0, $url, $this->{url_paths}->{pub_rel} ) ) {
+        print STDERR "- matched pub_rel at " . join( '/', @$upath ) . "\n"
+          if $noisy;
         $is_pub = 1;
     }
+    elsif ( $upath = _match( 1, $url, $this->{url_paths}->{script_abs} ) ) {
+        print STDERR "- matched script_abs at " . join( '/', @$upath ) . "\n"
+          if $noisy;
+        $is_script = 1;
+    }
+    elsif ( $upath = _match( 0, $url, $this->{url_paths}->{script_rel} ) ) {
+        print STDERR "- matched script_rel at " . join( '/', @$upath ) . "\n"
+          if $noisy;
+        $is_script = 1;
+    }
 
-    return $url unless $upath;
+    unless ($upath) {
+        return undef;
+    }
 
     #print STDERR "- leaving ".join('/',@$upath)."\n";
 
