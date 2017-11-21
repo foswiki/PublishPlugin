@@ -372,8 +372,12 @@ sub publish {
     # NEWTOPICLINKSYMBOL LINKTOOLTIPINFO
     $Foswiki::Plugins::SESSION->renderer()->{NEWLINKSYMBOL} = '';
 
+    $this->logInfo( "*Publisher:* ", Foswiki::Func::getWikiName() );
+    $this->logInfo( "*Date:* ",      Foswiki::Func::formatTime( time() ) );
+    $this->_loadParams($params);
+
     # Handle =enableplugins=. We simply muddy-boots the foswiki config.
-    if ( $this->{opts}->{enableplugins} ) {
+    if ( $this->{opt}->{enableplugins} ) {
 
         # Make a map of plugins known to =configure=
         my %state = map { $_ => $Foswiki::cfg{Plugins}{$_}{Enabled} }
@@ -402,10 +406,6 @@ sub publish {
             $Foswiki::cfg{Plugins}{$plugin}{Enabled} = $enable;
         }
     }
-
-    $this->logInfo( "*Publisher:* ", Foswiki::Func::getWikiName() );
-    $this->logInfo( "*Date:* ",      Foswiki::Func::formatTime( time() ) );
-    $this->_loadParams($params);
 
     $this->{opt}->{publishskin} ||=
       Foswiki::Func::getPreferencesValue('PUBLISHSKIN')
@@ -755,13 +755,18 @@ sub _publishTopic {
     foreach my $plugin ( %{ $Foswiki::cfg{Plugins} } ) {
         next
           unless ref( $Foswiki::cfg{Plugins}{$plugin} )
-          && $Foswiki::cfg{Plugins}{$plugin}{Module};
+          && $Foswiki::cfg{Plugins}{$plugin}{Module}
+          && $Foswiki::cfg{Plugins}{$plugin}{Enabled};
         my $module = $Foswiki::cfg{Plugins}{$plugin}{Module};
         my $initfn = $module . '::initPlugin';
         if ( defined &$initfn ) {
             eval {
                 no strict 'refs';
-                &$initfn( $topic, $web, Foswiki::Func::getWikiName(), $web );
+                &$initfn(
+                    $topic, $web,
+                    Foswiki::Func::getWikiName(),
+                    $Foswiki::cfg{SystemWebName}
+                );
                 use strict 'refs';
             };
         }
