@@ -1142,12 +1142,11 @@ sub _processURL {
     my $attachment;
     my $new = $url;
 
-    $web   = shift(@$upath) if scalar(@$upath);
-    $topic = shift(@$upath) if scalar(@$upath);
-
     # Is it an internal resource?
     if ($is_pub) {
-        $attachment = shift(@$upath) if scalar(@$upath);
+        $attachment = pop(@$upath) if scalar(@$upath);
+        $topic      = pop(@$upath) if scalar(@$upath);
+        $web = join( '/', @$upath );
         $new = $this->_processInternalResource( $web, $topic, $attachment );
     }
     elsif ($is_script) {
@@ -1156,6 +1155,8 @@ sub _processURL {
         # for the template being generated. We do this even if the
         # topic isn't included in the processed outout, so we may
         # end up with broken links. C'est la guerre.
+        $topic = pop(@$upath) if scalar(@$upath);
+        $web = join( '/', @$upath );
         $new = $this->{archive}->getTopicPath( $web, $topic );
     }
     else {
