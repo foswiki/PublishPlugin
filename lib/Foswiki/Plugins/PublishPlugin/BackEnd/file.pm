@@ -122,6 +122,11 @@ sub param_schema {
             default   => 'file',
             validator => \&validateFilename
         },
+        defaultpage => {
+            desc => 'Web.Topic to redirect to from index.html / default.html',
+            default   => '',
+            validator => \&validatePath
+        },
         googlefile => {
             desc =>
 'Google HTML verification file name (see https://sites.google.com/site/webmasterhelpforum/en/verification-specifics)',
@@ -268,20 +273,29 @@ sub close {
     }
 
     # Write default.htm and index.html
-    my $links = <<'HEAD';
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-</head>
-<body>
+    my $html = <<'HEAD';
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+          "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en-US" xml:lang="en-US">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 HEAD
-    $links .=
-      join( "</br>\n", map { "<a href='$_'>$_</a>" } @{ $this->{html_files} } );
-    $links .= "\n</body>";
-    $links = Encode::encode_utf8($links);
-    $this->addByteData( 'default.htm', $links );
-    $this->addByteData( 'index.html',  $links );
+    if ( $this->{params}->{defaultpage} ) {
+        $this->{params}->{defaultpage} =~ s/\./\//g;
+        $html .= '<meta http-equiv="REFRESH" content="0; url=';
+        $html .= $this->{params}->{defaultpage};
+        $html .=
+".html\" />\n</head><body>$this->{params}->{defaultpage} - please wait";
+    }
+    else {
+        $html .= "</head><body>";
+        $html .= join( "</br>\n",
+            map { "<a href='$_'>$_</a>" } @{ $this->{html_files} } );
+    }
+    $html .= "\n</body></html>";
+    $html = Encode::encode_utf8($html);
+    $this->addByteData( 'default.htm', $html );
+    $this->addByteData( 'index.html',  $html );
 
     return $this->{output_file};
 }
