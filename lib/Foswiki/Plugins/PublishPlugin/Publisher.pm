@@ -1136,7 +1136,7 @@ sub _processURL {
     }
 
     unless ($upath) {
-        return undef;
+        return $url;
     }
 
     #print STDERR "- leaving ".join('/',@$upath)."\n";
