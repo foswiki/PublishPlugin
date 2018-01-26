@@ -581,6 +581,9 @@ TEXT
     # Force static context for all published topics
     Foswiki::Func::getContext()->{static} = 1;
 
+    my $safe = $Foswiki::cfg{ScriptUrlPaths};
+    undef $Foswiki::cfg{ScriptUrlPaths};
+
     foreach my $wt (@topics) {
         try {
             $this->_publishTopic( split( /\./, $wt, 2 ) );
@@ -590,6 +593,7 @@ TEXT
             $this->logError( "$wt not published: " . ( $e->{-text} || '' ) );
         };
     }
+    $Foswiki::cfg{ScriptUrlPaths} = $safe;
 
     # Close archive
     my $endpoint = $this->{archive}->close();
@@ -1220,6 +1224,7 @@ sub _processExternalResource {
     my $response = Foswiki::Func::getExternalResource($url);
     if ( $response->is_error() ) {
         $this->logError("$url is not fetchable");
+        return $url;
     }
 
     my $ext;
