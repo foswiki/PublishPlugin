@@ -25,6 +25,11 @@ my %PARAM_SCHEMA = (
         desc      => 'Copy Off-Wiki Resources',
         validator => \&validateBoolean
     },
+    debug => {
+        default   => 0,
+        desc      => 'Enable debug messages',
+        validator => \&validateBoolean
+    },
     enableplugins => {
 
         # Keep this list in sync with System.PublishPlugin
@@ -459,17 +464,24 @@ TEXT
         foreach my $expr (@wild) {
             my $filter = ( $expr =~ s/^-// );
 
+            # Split specification into web and topics
             my ( $w, $t ) = split( /\./, $expr, 2 );
             if ( $w && !$t ) {
                 $t = $w;
                 $w = '*';
             }
+
+            # Web. means all topics in Web
+            # . means all topics in all webs
+            # .Fred means all topics called Fred in all webs
             $w = '*' unless length($w);
             $t = '*' unless length($t);
 
             my $wre = _wildcards2RE($w);
             my $tre = _wildcards2RE($t);
             if ($filter) {
+
+                # Exclude topics matching this RE
                 my @filtered;
                 while ( my $twt = pop(@topics) ) {
                     ( $w, $t ) = split( /\./, $twt, 2 );
@@ -685,6 +697,12 @@ sub _log {
 sub logInfo {
     my $this = shift;
     $this->_log( 'info', '', @_ );
+}
+
+sub logDebug {
+    my $this = shift;
+    return unless $this->{params}->{debug};
+    $this->_log( 'debug', '', @_ );
 }
 
 sub logWarn {
@@ -967,8 +985,6 @@ sub _rewriteTag {
 
 # Rewrite a URL - be it internal or external. Internal URLs that point to
 # anything in pub, or to scripts, are always rewritten.
-my $noisy = 0;
-
 sub _processURL {
     my ( $this, $url ) = @_;
 
@@ -984,13 +1000,15 @@ sub _processURL {
     # $url->equery
     # $url->frag
 
+    $this->logDebug( "Processing URL ", $url );
+
     if ( !defined $url->path() || length( $url->path() ) == 0 ) {
 
-        print STDERR "- no path\n" if $noisy;
+        $this->logDebug("- no path in ");
 
         # is there a frag?
         if ( $url->can('fragment') && $url->fragment ) {
-            print STDERR "- frag " . $url->fragment . "\n" if $noisy;
+            $this->logDebug( "- frag " . $url->fragment );
             return '#' . $url->fragment();
         }
 
@@ -1010,7 +1028,7 @@ sub _processURL {
     sub _match {
         my ( $abs, $url, $match ) = @_;
 
-        print STDERR "Test $url against $match\n" if $noisy;
+        $this->logDebug("Test $url against $match");
 
         # Some older parsers used to allow the scheme name to be present
         # in the relative URL if it was the same as the base URL
@@ -1019,54 +1037,53 @@ sub _processURL {
         if ( $match->can('scheme') && $match->scheme ) {
             if ( $url->can('scheme') ) {
                 unless ( _matchPart( $url->scheme, $match->scheme ) ) {
-                    print STDERR "- scheme mismatch "
-                      . $url->scheme . " and "
-                      . $match->scheme . "\n"
-                      if $noisy;
+                    $this->logDebug( "- scheme mismatch "
+                          . $url->scheme . " and "
+                          . $match->scheme );
                     return undef;
                 }
             }
             else {
-                print STDERR "- no scheme on url\n" if $noisy;
+                $this->logDebug("- no scheme on url");
                 return undef;
             }
         }
         elsif ( $url->can('scheme') && $url->scheme ) {
-            print STDERR "- no scheme on match\n" if $noisy;
+            $this->logDebug("- no scheme on match");
             return undef;
         }
 
         if ( $match->can('host') && $match->host ) {
             if ( $url->can('host') ) {
                 unless ( _matchPart( $url->host, $match->host ) ) {
-                    print STDERR "- host mismatch\n" if $noisy;
+                    $this->logDebug("- host mismatch");
                     return undef;
                 }
             }
             else {
-                print STDERR "- no host on url\n" if $noisy;
+                $this->logDebug("- no host on url");
                 return undef;
             }
         }
         elsif ( $url->can('host') && $url->host ) {
-            print STDERR "- no host on match\n" if $noisy;
+            $this->logDebug("- no host on match");
             return undef;
         }
 
         if ( $match->can('port') && length( $match->port ) ) {
             if ( $url->can('port') ) {
                 unless ( _matchPart( $url->port, $match->port ) ) {
-                    print STDERR "- port mismatch\n" if $noisy;
+                    $this->logDebug("- port mismatch");
                     return undef;
                 }
             }
             else {
-                print STDERR "- no port on url\n" if $noisy;
+                $this->logDebug("- no port on url");
                 return undef;
             }
         }
         elsif ( $url->can('port') && length( $url->port ) ) {
-            print STDERR "- no port on match\n" if $noisy;
+            $this->logDebug("- no port on match");
             return undef;
         }
 
@@ -1079,16 +1096,16 @@ sub _processURL {
                 || $mpath[0] eq 'SCRIPT' )
           )
         {
-            print STDERR "- trim $upath[0] match $mpath[0]\n" if $noisy;
+            $this->logDebug("- trim $upath[0] match $mpath[0]");
             shift(@mpath);
             shift(@upath);
         }
         if ( $mpath[0] eq 'WEB' ) {
-            print STDERR "- matched " . join( '/', @upath ) . "\n" if $noisy;
+            $this->logDebug( "- matched " . join( '/', @upath ) );
             return \@upath;
         }
         else {
-            print STDERR "- no match at $mpath[0]\n" if $noisy;
+            $this->logDebug("- no match at $mpath[0]");
             return undef;
         }
     }
@@ -1115,23 +1132,19 @@ sub _processURL {
 
     my ( $is_script, $is_pub, $upath ) = ( 0, 0 );
     if ( $upath = _match( 1, $url, $this->{url_paths}->{pub_abs} ) ) {
-        print STDERR "- matched pub_abs at " . join( '/', @$upath ) . "\n"
-          if $noisy;
+        $this->logDebug( "- matched pub_abs at " . join( '/', @$upath ) );
         $is_pub = 1;
     }
     elsif ( $upath = _match( 0, $url, $this->{url_paths}->{pub_rel} ) ) {
-        print STDERR "- matched pub_rel at " . join( '/', @$upath ) . "\n"
-          if $noisy;
+        $this->logDebug( "- matched pub_rel at " . join( '/', @$upath ) );
         $is_pub = 1;
     }
     elsif ( $upath = _match( 1, $url, $this->{url_paths}->{script_abs} ) ) {
-        print STDERR "- matched script_abs at " . join( '/', @$upath ) . "\n"
-          if $noisy;
+        $this->logDebug( "- matched script_abs at " . join( '/', @$upath ) );
         $is_script = 1;
     }
     elsif ( $upath = _match( 0, $url, $this->{url_paths}->{script_rel} ) ) {
-        print STDERR "- matched script_rel at " . join( '/', @$upath ) . "\n"
-          if $noisy;
+        $this->logDebug( "- matched script_rel at " . join( '/', @$upath ) );
         $is_script = 1;
     }
 
@@ -1168,7 +1181,7 @@ sub _processURL {
         $new = $this->_processExternalResource($url);
     }
 
-    #print STDERR "-mapped $new";
+    $this->logDebug("-mapped $url to $new");
     return $new;
 }
 

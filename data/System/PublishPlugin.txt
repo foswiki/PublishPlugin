@@ -130,7 +130,7 @@ table.publishForm .paramCol {
         <td class="infoCol">
 The =topics= parameter is used to give a (comma-separated) list of web.topic names. These can be specified using  [[#WildcardPattern][wildcard patterns]].
    * =Myweb.*= will publish all topics in the =Myweb= web (but not in subwebs)
-   * =Myweb*.*= will publish all topics in the =Myweb= web and all it's subwebs
+   * =Myweb*.*= will publish all topics in the =Myweb= web and all its subwebs
    * =*.*= will publish all topics in the wiki
    * =Web.= implies =Web.*=, and =.Topic= and =Topic= both imply =*.Topic=
    * The list is expanded in left-right order. You can edit the list at any point by prefixing an entry with a =-= sign e.g. =*.*,-*.Last*= will publish all topics in the wiki in web.topic order except topics starting with =Last=
@@ -335,6 +335,18 @@ don't need a history.
                 =history=
               </td>
             </tr>
+            <tr>
+              <td class="nameCol">Debug</td>
+              <td class="inputCol">
+                <input type="checkbox" name="debug" class="foswikiCheckbox" />
+              </td>
+              <td class="infoCol">
+Enable to get a lot of debug messages, mainly relating to the processing of URL.
+              </td>
+              <td class="paramCol">
+                =debug=
+              </td>
+            </tr>
           </table>
           %ENDTWISTY%
         </td>
@@ -454,9 +466,10 @@ If you are using an on-disk file store, such as !PlainFile or one of the RCS sto
 
 %X% Note that overwriting attachments this way is extremely dangerous, so this should only be done by experts! You have been warned. %X%
 
+   * Open =configure=
    * First set the ={Plugins}{PublishPlugin}{Dir}= to the same as ={PubDir}=
    * Then publish with a =relativedir= setting that corresponds to the attachment directory for the web/topic that you want to attach to
-   * If {AutoAttachPubFiles} is enabled, it will automatically be attached to the topic.
+   * If ={AutoAttachPubFiles}= is enabled, it will automatically be attached to the topic.
 
 ---++ Installation Instructions
 

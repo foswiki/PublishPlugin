@@ -36,21 +36,30 @@ sub new {
 
     my $this = $class->SUPER::new( $params, $logger );
 
+    # See param_schema for information about outfile and relativedir
     $this->{output_file} = $params->{relativedir} || '';
     $this->{output_file} =
       $this->pathJoin( $this->{output_file}, $params->{outfile} )
       if $params->{outfile};
 
+    # The root of the directory structure we are writing to.
     $this->{file_root} =
       $this->pathJoin( $Foswiki::cfg{Plugins}{PublishPlugin}{Dir},
         $this->{output_file} );
+    $this->{logger}->logDebug( '', 'Publishing to ', $this->{file_root} );
 
     $this->{resource_id} = 0;
 
+    # List of web.topic paths to already-published topics.
     $this->{last_published} = {};
 
-    # Capture HTML generated for use by subclasses
+    # Capture HTML generated.
     $this->{html_files} = [];
+
+    # Note that both html_files and last_published are indexed on the
+    # final generated path for the HTML. This *may* look like the
+    # web.topic path, but that cannot be assumed as getTopicPath may
+    # have changed it significantly.
 
     if ( !$params->{keep} || $params->{keep} eq 'nothing' ) {
 
@@ -60,26 +69,29 @@ sub new {
     elsif ( !$params->{dont_keep_existing} ) {
 
         # See what's worth keeping
-        $this->_scanExistingHTML( $this->{file_root}, '' );
+        $this->_scanExistingHTML('');
     }
 
     return $this;
 }
 
-# Find existing HTML in published dir structure to add to sitemap etc
+# Find existing HTML in published dir structure to add to sitemap and act
+# as targets for links.
+# $w - path relative to publishing root
 sub _scanExistingHTML {
-    my ( $this, $root, $relpath ) = @_;
+    my ( $this, $w ) = @_;
     my $d;
-    return unless ( opendir( $d, "$root/$relpath" ) );
+    return unless ( opendir( $d, "$this->{file_root}/$w" ) );
     while ( my $f = readdir($d) ) {
         next if $f =~ /^\./;
-        if ( -d "$root/$relpath/$f" ) {
-            $this->_scanExistingHTML( $root, $relpath ? "$relpath/$f" : $f );
+        if ( -d "$this->{file_root}/$w/$f" ) {
+            $this->_scanExistingHTML( $w ? "$w/$f" : $f );
         }
-        elsif ( $relpath && $f =~ /\.html$/ ) {
-            my $p = "$relpath/$f";
-            push( @{ $this->{html_files} }, Encode::decode_utf8($p) );
-            $this->{last_published}->{$p} = ( stat("$root/$p") )[9];
+        elsif ( $w && $f =~ /^\.html$/ ) {
+            my $p = "$w/$f";    # path relative to file_root
+            push( @{ $this->{html_files} }, $p );
+            $this->{last_published}->{$p} =
+              ( stat("$this->{file_root}/$p") )[9];
         }
     }
     closedir($d);
@@ -111,6 +123,16 @@ sub validatePath {
     return $v;
 }
 
+# Validate that the parameter refers to an existing web/topic
+sub validateWebTopic {
+    my ( $v, $k ) = @_;
+    return $v unless $v;
+    my @wt = Foswiki::Func::normalizeWebTopicName( 'NOT_A_WEB', $v );
+    die "$k ($v) is not an existing topic " . join( ';', @wt )
+      unless Foswiki::Func::topicExists(@wt);
+    return $v;
+}
+
 # Implement  Foswiki::Plugins::PublishPlugin::BackEnd
 sub param_schema {
     my $class = shift;
@@ -123,9 +145,10 @@ sub param_schema {
             validator => \&validateFilename
         },
         defaultpage => {
-            desc => 'Web.Topic to redirect to from index.html / default.html',
+            desc =>
+'Web.Topic to redirect to from index.html / default.html. If you leave this blank, the index will contain a simple list of all the published topics.',
             default   => '',
-            validator => \&validatePath
+            validator => \&validateWebTopic
         },
         googlefile => {
             desc =>
@@ -158,8 +181,9 @@ sub param_schema {
 # Implement Foswiki::Plugins::PublishPlugin::BackEnd
 sub getTopicPath {
     my ( $this, $web, $topic ) = @_;
+
     my @path = split( /\/+/, $web );
-    push( @path,, $topic . '.html' );
+    push( @path, $topic . '.html' );
     return $this->pathJoin(@path);
 }
 
@@ -167,7 +191,7 @@ sub getTopicPath {
 sub alreadyPublished {
     my ( $this, $web, $topic ) = @_;
     return 0 unless ( $this->{params}->{keep} // '' ) eq 'unchanged';
-    my $pd = $this->{last_published}->{"$web/$topic.html"};
+    my $pd = $this->{last_published}->{ $this->getTopicPath( $web, $topic ) };
     return 0 unless $pd;
     my ($cd) = Foswiki::Func::getRevisionInfo( $web, $topic );
     return 0 unless $cd;
@@ -178,10 +202,7 @@ sub alreadyPublished {
 sub addTopic {
     my ( $this, $web, $topic, $text ) = @_;
 
-    my @path = grep { length($_) } split( /\/+/, $web );
-    push( @path, $topic . '.html' );
-
-    my $path = $this->pathJoin(@path);
+    my $path = $this->getTopicPath( $web, $topic );
     push( @{ $this->{html_files} }, $path );
     return $this->addByteData( $path, Encode::encode_utf8($text) );
 }
@@ -190,11 +211,9 @@ sub addTopic {
 sub addAttachment {
     my ( $this, $web, $topic, $attachment, $data ) = @_;
 
-    my @path = grep { length($_) } split( /\/+/, $web );
-    push( @path, $topic . '.attachments' );
-    push( @path, $attachment );
-
-    my $path = $this->pathJoin(@path);
+    my $path =
+      $this->pathJoin( $this->getTopicPath( $web, "$topic.attachments" ),
+        $attachment );
     return $this->addByteData( $path, $data );
 }
 
@@ -251,13 +270,16 @@ sub addByteData {
 sub close {
     my $this = shift;
 
+    Foswiki::Func::loadTemplate('PublishPlugin');
+
     # write sitemap.xml
-    my $sitemap =
-        '<?xml version="1.0" encoding="UTF-8"?>'
-      . '<urlset xmlns="http://www.google.com/schemas/sitemap/0.84">'
-      . join( "\n",
-        map { '<url><loc>' . $_ . '</loc></url>'; } @{ $this->{html_files} } )
-      . '</urlset>';
+    my $smurl  = Foswiki::Func::expandTemplate('PublishPlugin:sitemap_url');
+    my $smurls = join( "\n",
+        map { my $x = $smurl; $x =~ s/%URL%/$_/g; $x }
+          @{ $this->{html_files} } );
+    my $sitemap = Foswiki::Func::expandTemplate('PublishPlugin:sitemap');
+    $sitemap =~ s/%URLS%/$smurls/g;
+
     $this->addByteData( 'sitemap.xml', Encode::encode_utf8($sitemap) );
 
     # Write Google verification files (comma separated list)
@@ -265,34 +287,29 @@ sub close {
         my @files = split( /\s*,\s*/, $this->{params}->{googlefile} );
         for my $file (@files) {
             my $simplehtml =
-                '<html><title>'
-              . $file
-              . '</title><body>Google verification</body></html>';
+              Foswiki::Func::expandTemplate('PublishPlugin:googlefile');
+            $simplehtml =~ s/%FILE%/$file/g;
             $this->addByteData( $file, Encode::encode_utf8($simplehtml) );
         }
     }
 
     # Write default.htm and index.html
-    my $html = <<'HEAD';
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-          "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en-US" xml:lang="en-US">
-  <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-HEAD
+    my $html = Foswiki::Func::expandTemplate('PublishPlugin:redirect');
     if ( $this->{params}->{defaultpage} ) {
-        $this->{params}->{defaultpage} =~ s/\./\//g;
-        $html .= '<meta http-equiv="REFRESH" content="0; url=';
-        $html .= $this->{params}->{defaultpage};
-        $html .=
-".html\" />\n</head><body>$this->{params}->{defaultpage} - please wait";
+        my @wt =
+          Foswiki::Func::normalizeWebTopicName( undef,
+            $this->{params}->{defaultpage} );
+        my $mtag = "<meta http-equiv=\"REFRESH\" content=\"0; url="
+          . $this->getTopicPath(@wt) . "\" />";
+        $html =~ s/%HEAD%/$mtag/g;
+        $html =~ s/%BODY%/$this->{params}->{defaultpage} - please wait/g;
     }
     else {
-        $html .= "</head><body>";
-        $html .= join( "</br>\n",
+        $html =~ s/%HEAD%//g;
+        my $bod = join( "</br>\n",
             map { "<a href='$_'>$_</a>" } @{ $this->{html_files} } );
+        $html =~ s/%BODY%/$bod/g;
     }
-    $html .= "\n</body></html>";
     $html = Encode::encode_utf8($html);
     $this->addByteData( 'default.htm', $html );
     $this->addByteData( 'index.html',  $html );

@@ -38,8 +38,8 @@ use Assert;
 Construct a new back end.
    * =$params= - optional parameter hash, may contain generator-specific
      options
-   * =$logger= - ref to an object that supports logWarn, logInfo and logError
-     methods (see Publisher.pm)
+   * =$logger= - ref to an object that supports logDebug, logWarn, logInfo
+     and logError methods (see Publisher.pm)
 =cut
 
 sub new {
@@ -55,13 +55,15 @@ sub new {
     return $this;
 }
 
-# Like join, but for dir and url paths, for subclasses
+# Like join, but for dir and url paths, protected utility for subclasses
 sub pathJoin {
     my $this = shift;
+
+    # use length() to exclude undef and empty path els
     my $all = join( '/', grep { length($_) } @_ );
     $all =~ s://+:/:g;                   # doubled slash
     $all =~ s:/+$::;                     # trailing /
-    $all =~ s!^([a-zA-Z0-9]+:/)!$1/!;    # reslash abs urls
+    $all =~ s!^([a-zA-Z0-9]+:/)!$1/!;    # reslash absolute urls
     return $all;
 }
 

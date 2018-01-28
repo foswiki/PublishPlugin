@@ -22,7 +22,7 @@ use Foswiki::Plugins::PublishPlugin::BackEnd::file;
 our @ISA = ('Foswiki::Plugins::PublishPlugin::BackEnd::file');
 
 use constant DESCRIPTION =>
-'Single HTML file containing all topics. Attachments (and external resources if =copyexternal is selected=) will be saved to a top level =_rsrc= directory next to the HTML file.';
+'Single HTML file containing all topics. If =copyexternal= is selected, external resources will be saved to a top level =_files= directory next to the HTML file.';
 
 sub new {
     my ( $class, $params, $logger ) = @_;
@@ -30,10 +30,13 @@ sub new {
     $params->{dont_scan_existing} = 1;
     my $this = $class->SUPER::new( $params, $logger );
 
-    $this->{flatfile} = ( $params->{outfile} || 'flatfile' );
-    $this->{flatfile} .= '.html' unless $this->{flatfile} =~ /\.\w+$/;
+    my $flatfile = ( $params->{outfile} || 'flatfile' );
+    $this->{flatfile} =~ s/\.\w+$//;
+    $this->{flatfile_rsrc} = $flatfile . "_files";
+    $this->{flatfile_html} = $flatfile . ".html";
 
-    my $fn = "$Foswiki::cfg{Plugins}{PublishPlugin}{Dir}/$this->{flatfile}";
+    my $fn =
+      "$Foswiki::cfg{Plugins}{PublishPlugin}{Dir}/$this->{flatfile_html}";
     my $fh;
     if ( open( $fh, '>', $fn ) ) {
         binmode($fh);
@@ -49,6 +52,7 @@ sub param_schema {
     my $class = shift;
     my $base  = $class->SUPER::param_schema();
     delete $base->{keep};
+    delete $base->{defaultpage};    # meaningless in a flat file
     $base->{outfile}->{default} = 'flatfile';
     return $base;
 }
@@ -72,11 +76,12 @@ sub addTopic {
     # Topics can be added inline to master with an anchor
     my $anchor = _makeAnchor( $web, $topic );
     my $fh = $this->{flatfh};
-    print $fh "<a name='$anchor'></a>";
+    print $fh "<a name=\"$anchor\"'></a>";
     print $fh $text;
     return '#' . $anchor;
 }
 
+# Implement Foswiki::Plugins::PublishPlugin::BackEnd
 sub addAttachment {
 
     # Default is to store attachments in a .attachments dir next to
@@ -86,6 +91,36 @@ sub addAttachment {
     return $this->addResource( $data, $attachment );
 }
 
+# Implement Foswiki::Plugins::PublishPlugin::BackEnd
+sub addResource {
+    my ( $this, $data, $name ) = @_;
+    my $prefix = '';
+    my $ext    = '';
+    if ( $ext =~ /(.*)(\.\w+)$/ ) {
+        $prefix = $1 // '';
+        $ext = $2;
+    }
+    $this->{resource_id}++;
+    my $path = "$this->{flatfile_rsrc}/$prefix$this->{resource_id}$ext";
+    my $dest = "$Foswiki::cfg{Plugins}{PublishPlugin}{Dir}/$path";
+    $this->addPath( $dest, 1 );
+    my $fh;
+    unless ( open( $fh, ">", $dest ) ) {
+        $this->{logger}->logError("Failed to write $dest:  $!");
+        return;
+    }
+    if ( defined $data ) {
+        print $fh $data;
+    }
+    else {
+        $this->{logger}->logError("$dest has no data, empty file created");
+    }
+    close($fh);
+    $this->{logger}->logInfo( '', 'Published ' . $path );
+    return $path;
+}
+
+# Implement Foswiki::Plugins::PublishPlugin::BackEnd
 sub close {
     my $this = shift;
 

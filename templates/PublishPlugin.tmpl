@@ -1,0 +1,25 @@
+%TMPL:DEF{"PublishPlugin:redirect"}%
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en-US" xml:lang="en-US">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    %HEAD%
+  </head>
+  <body>
+    %BODY%
+  </body>
+</html>
+%TMPL:END%
+%TMPL:DEF{"PublishPlugin:sitemap_url"}%
+<url><loc>%URL%</loc></url>
+%TMPL:END%
+%TMPL:DEF{"PublishPlugin:sitemap"}%
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.google.com/schemas/sitemap/0.84">
+  %URLS%
+</urlset>
+%TMPL:END%
+%TMPL:DEF{"PublishPlugin:googlefile"}%
+<html><title>%FILE%</title><body>Google verification</body></html>
+%TMPL:END%
