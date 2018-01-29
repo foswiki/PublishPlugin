@@ -210,7 +210,7 @@ provide a finer level of control.
 	      <td class="infoCol">
 Setting of the =SKIN= preference to be used when topics are
 published. See [[%SYSTEMWEB%.Skins][Skins]] for more informations on
-skins. You are recommended to pick =basic_publish=, or =plain=, or a
+skins. You can pick =basic_publish= (a very, very simple skin), or =plain=, or a
 =print= skin.  Your installation may also offer a special =export= or
 =publish= skin.<br />%I% The =view= [[SkinTemplates][template]] is
 used to generate published pages, so =view.%URLPARAM{"skin"
@@ -518,6 +518,7 @@ apply.
 ---++ Change History
 
 %TABLE{columnwidths="10em" tablewidth="100%"}%
+|  3.4 (29 Jan 2018) | Fixes for various problems, and added flatdir generator |
 |  3.0 (22 Apr 2017) | Crawford Currie extensively rewrote to separate concerns and get rid of some of the poor code that had crept in over the years. Removed ability to publish several templates in one go, due to performance and complexity concerns. Removed flatpdf format, as it's pretty useless with modern htmldoc. Deprecated =web=, =topiclist=, =inclusions=, =exclusions= and simplified to one parameter, =topics=, renamed =topicsearch= to =rexclude= and =skin= to =publishskin=. WARNING: untested on Foswiki <2 |
 |  2.5 (25 Jan 2017) | Update to work with Foswiki 2.x.  Foswikitask:Item14198 Foswikitask:Item11808 Foswikitask:Item8898  |
 |  2.4 (30 Jul 2012) | Foswikitask:Item12016 Add capability to construct flat HTML and PDF files. Bugfixes: Foswikitask:Item11988 Foswikitask:Item11339 Foswikitask:Item11345 Foswikitask:Item8260 Foswikitask:Item10597 Foswikitask:Item11346 |

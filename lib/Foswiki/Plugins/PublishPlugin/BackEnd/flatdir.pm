@@ -23,13 +23,28 @@ use Foswiki::Plugins::PublishPlugin::BackEnd::file;
 our @ISA = ('Foswiki::Plugins::PublishPlugin::BackEnd::file');
 
 use constant DESCRIPTION =>
-'Flat directory of HTML files. Attachments (and external resources if =copyexternal is selected=) will be saved to a top level =_rsrc= directory next to the HTML.';
+'Flat directory of HTML and attachment files. External resources (if =copyexternal is selected=) will be saved to a =_rsrc= subdirectory.';
 
-# Override Foswiki::Plugins::PublishPlugin::BackEnd
+# Override Foswiki::Plugins::PublishPlugin::BackEnd::file
+sub param_schema {
+    my $class = shift;
+    my $base  = $class->SUPER::param_schema();
+    $base->{outfile}->{default} = 'flatdir';
+    return $base;
+}
+
+# Override Foswiki::Plugins::PublishPlugin::BackEnd::file
 sub getTopicPath {
     my ( $this, $web, $topic ) = @_;
     my @path = split( /\/+/, $web );
     return join( '_', @path, $topic . '.html' );
+}
+
+# Override Foswiki::Plugins::PublishPlugin::BackEnd::file
+sub getAttachmentPath {
+    my ( $this, $web, $topic, $attachment ) = @_;
+    my @path = split( /\/+/, $web );
+    return join( '_', @path, $topic, $attachment );
 }
 
 1;

@@ -27,27 +27,26 @@ use constant DESCRIPTION =>
 sub new {
     my ( $class, $params, $logger ) = @_;
 
-    $params->{dont_scan_existing} = 1;
     my $this = $class->SUPER::new( $params, $logger );
 
-    my $flatfile = ( $params->{outfile} || 'flatfile' );
-    $this->{flatfile} =~ s/\.\w+$//;
-    $this->{flatfile_rsrc} = $flatfile . "_files";
-    $this->{flatfile_html} = $flatfile . ".html";
+    # {output} is the root for filenames in this generator.
+    $this->{output} = $params->{outfile} || 'flatfile';
 
-    my $fn =
-      "$Foswiki::cfg{Plugins}{PublishPlugin}{Dir}/$this->{flatfile_html}";
-    my $fh;
-    if ( open( $fh, '>', $fn ) ) {
-        binmode($fh);
-        $this->{flatfh} = $fh;
-    }
-    else {
-        $this->{logger}->logError("Cannot write $fn: $!");
-    }
+    # Append to {output} to save external resources to
+    $this->{resource_path} = "_files";
+
     return $this;
 }
 
+sub getReady {
+    my $this = shift;
+
+    # Prune any existing resources
+    File::Path::rmtree(
+        "$this->{root}/$this->{relative_path}/$this->{output}_files");
+}
+
+# Override Foswiki::Plugins::PublishPlugin::BackEnd::file
 sub param_schema {
     my $class = shift;
     my $base  = $class->SUPER::param_schema();
@@ -65,67 +64,57 @@ sub _makeAnchor {
     return $s;
 }
 
+# Override Foswiki::Plugins::PublishPlugin::BackEnd::file
 sub getTopicPath {
     my ( $this, $web, $topic ) = @_;
     return '#' . _makeAnchor( $web, $topic );
 }
 
+# Override Foswiki::Plugins::PublishPlugin::BackEnd::file
 sub addTopic {
     my ( $this, $web, $topic, $text ) = @_;
 
     # Topics can be added inline to master with an anchor
     my $anchor = _makeAnchor( $web, $topic );
-    my $fh = $this->{flatfh};
+    my $fh = $this->{html_fh};
+    if ( !$fh ) {
+        my $fn = "$this->{root}/$this->{relative_path}/$this->{output}.html";
+        if ( open( $fh, '>', $fn ) ) {
+            binmode($fh);
+            $this->{html_fh} = $fh;
+        }
+        else {
+            $this->{logger}->logError("Cannot write $fn: $!");
+        }
+    }
     print $fh "<a name=\"$anchor\"'></a>";
-    print $fh $text;
+    print $fh Encode::encode_utf8($text);
     return '#' . $anchor;
 }
 
-# Implement Foswiki::Plugins::PublishPlugin::BackEnd
-sub addAttachment {
+# Override Foswiki::Plugins::PublishPlugin::BackEnd::file
+sub getAttachmentPath {
+    my ( $this, $web, $topic, $attachment ) = @_;
 
     # Default is to store attachments in a .attachments dir next to
     # the topic. That won't work for flatfile, as the topics are all
     # in one file, so whack them into the resource dir instead.
     my ( $this, $web, $topic, $attachment, $data ) = @_;
-    return $this->addResource( $data, $attachment );
+    return "_files/" . join( '_', split( /\/+/, $web ), $topic, $attachment );
 }
 
-# Implement Foswiki::Plugins::PublishPlugin::BackEnd
 sub addResource {
-    my ( $this, $data, $name ) = @_;
-    my $prefix = '';
-    my $ext    = '';
-    if ( $ext =~ /(.*)(\.\w+)$/ ) {
-        $prefix = $1 // '';
-        $ext = $2;
-    }
-    $this->{resource_id}++;
-    my $path = "$this->{flatfile_rsrc}/$prefix$this->{resource_id}$ext";
-    my $dest = "$Foswiki::cfg{Plugins}{PublishPlugin}{Dir}/$path";
-    $this->addPath( $dest, 1 );
-    my $fh;
-    unless ( open( $fh, ">", $dest ) ) {
-        $this->{logger}->logError("Failed to write $dest:  $!");
-        return;
-    }
-    if ( defined $data ) {
-        print $fh $data;
-    }
-    else {
-        $this->{logger}->logError("$dest has no data, empty file created");
-    }
-    close($fh);
-    $this->{logger}->logInfo( '', 'Published ' . $path );
-    return $path;
+    my ( $this, $data, $ext ) = @_;
+    my $p = $this->SUPER::addResource( $data, $ext );
+    return "$this->{output}$p";
 }
 
-# Implement Foswiki::Plugins::PublishPlugin::BackEnd
+# Override Foswiki::Plugins::PublishPlugin::BackEnd::file
 sub close {
     my $this = shift;
 
-    close( $this->{flatfile} ) if $this->{flatfile};
-    return $this->{flatfile};
+    close( $this->{html_fh} ) if $this->{html_fh};
+    return "$this->{relative_path}/$this->{output}.html";
 }
 
 1;

@@ -24,6 +24,8 @@ All archives are interfaced to by adding topics, attachments, and
 storing the data at a unique url that can be used in topics to
 link to that resource.
 
+Errors, warning, and debug info should be logged to the logger.
+
 =cut
 
 package Foswiki::Plugins::PublishPlugin::BackEnd;
@@ -55,16 +57,18 @@ sub new {
     return $this;
 }
 
-# Like join, but for dir and url paths, protected utility for subclasses
-sub pathJoin {
-    my $this = shift;
+=begin TML
 
-    # use length() to exclude undef and empty path els
-    my $all = join( '/', grep { length($_) } @_ );
-    $all =~ s://+:/:g;                   # doubled slash
-    $all =~ s:/+$::;                     # trailing /
-    $all =~ s!^([a-zA-Z0-9]+:/)!$1/!;    # reslash absolute urls
-    return $all;
+---++ ObjectMethod getReady()
+
+Generator has been constructed; perform any appropriate cleanup steps
+before executing.
+
+Default does nothing.
+
+=cut
+
+sub getReady {
 }
 
 =begin TML
@@ -122,27 +126,10 @@ sub alreadyPublished {
 
 =begin TML
 
----++ ObjectMethod addTopic($web, $topic, $text) -> $path
-
-Add the given topic to the archive and return the absolute path to
-the topic in the archive.
-
-Errors should be logged to the logger.
-
-=cut
-
-sub addTopic {
-    ASSERT( 0, "Pure virtual method requires implementation" );
-}
-
-=begin TML
-
 ---++ ObjectMethod getTopicPath($web, $topic) -> $path
 
-Return the absolute path to the topic in the archive - even if it
+Return the relative path to the topic in the archive - even if it
 isn't there!
-
-Errors should be logged to the logger.
 
 =cut
 
@@ -152,12 +139,36 @@ sub getTopicPath {
 
 =begin TML
 
+---++ ObjectMethod addTopic($web, $topic, $text) -> $path
+
+Add the given topic to the archive and return the relative path to
+the topic in the archive.
+
+=cut
+
+sub addTopic {
+    ASSERT( 0, "Pure virtual method requires implementation" );
+}
+
+=begin TML
+
+---++ ObjectMethod getAttachmentPath($web, $topic, $attachment) -> $path
+
+Return the path to the attachment in the archive - even if it
+isn't there!
+
+=cut
+
+sub getAttachmentPath {
+    ASSERT( 0, "Pure virtual method requires implementation" );
+}
+
+=begin TML
+
 ---++ ObjectMethod addAttachment($web, $topic, $att, $data) -> $path
 
-Add the given attachment to the archive, and return the absolute path
+Add the given attachment to the archive, and return the relative path
 to the attachment in the archive.
-
-Errors should be logged to the logger.
 
 =cut
 
@@ -167,14 +178,12 @@ sub addAttachment {
 
 =begin TML
 
----++ ObjectMethod addResource($data, $ext) -> $path
+---++ ObjectMethod addResource($data [, $ext]) -> $path
 
-Add the given resource to the archive, and return the url path to
+Add the given resource to the archive, and return the relative path to
 the resource in the archive.
 
 $ext is an optional hint as to the mime type e.g. '.gif'
-
-Errors should be logged to the logger.
 
 =cut
 
@@ -184,11 +193,10 @@ sub addResource {
 
 =begin TML
 
----++ ObjectMethod close() -> $url
+---++ ObjectMethod close() -> $path
 
-Close the archive, and return the absolute URL to the completed archive.
-
-Errors should be logged to the logger.
+Close the archive, and return the path to the completed archive
+relative to {PublishPlugin}{Dir}
 
 =cut
 

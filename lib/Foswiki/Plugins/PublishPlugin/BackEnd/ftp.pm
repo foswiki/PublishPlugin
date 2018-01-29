@@ -1,4 +1,4 @@
-# Copyright (C) 2005-2017 Crawford Currie, http://c-dot.co.uk
+# Copyright (C) 2005-2018 Crawford Currie, http://c-dot.co.uk
 # Copyright (C) 2006 Martin Cleaver, http://www.cleaver.org
 #
 # This program is free software; you can redistribute it and/or

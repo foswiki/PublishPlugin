@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2005-2017 Crawford Currie, http://c-dot.co.uk
+# Copyright (C) 2005-2018 Crawford Currie, http://c-dot.co.uk
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -37,16 +37,19 @@ sub new {
     require Archive::Tar;
     $this->{tgz} = Archive::Tar->new();
 
-    $this->{tgz_path} = $this->{output_file};    # from superclass
+    $this->{tgz_path} = $params->{outfile} || 'tgz';
     $this->{tgz_path} .= '.tgz' unless $this->{tgz_path} =~ /\.\w+$/;
-    $this->{tgz_file} =
-      $this->pathJoin( $Foswiki::cfg{Plugins}{PublishPlugin}{Dir},
-        $this->{tgz_path} );
-    $this->addPath( $this->{tgz_file}, 1 );
+    my @path = ( $Foswiki::cfg{Plugins}{PublishPlugin}{Dir} );
+    if ( $params->{relativedir} ) {
+        push( @path, split( /\/+/, $params->{relativedir} ) );
+    }
+    push( @path, $this->{tgz_path} );
+    $this->{tgz_file} = join( '/', @path );
 
     return $this;
 }
 
+# Override Foswiki::Plugins::PublishPlugin::BackEnd::file
 sub param_schema {
     my $class = shift;
     my $base  = $class->SUPER::param_schema();
@@ -55,6 +58,10 @@ sub param_schema {
     return $base;
 }
 
+sub addPath {
+}
+
+# Override Foswiki::Plugins::PublishPlugin::BackEnd::file
 sub addByteData {
     my ( $this, $file, $data ) = @_;
     $this->{logger}->logError( "Error adding $file: " . $this->{tgz}->error() )
@@ -62,6 +69,7 @@ sub addByteData {
     return $file;
 }
 
+# Override Foswiki::Plugins::PublishPlugin::BackEnd::file
 sub close {
     my $this = shift;
 

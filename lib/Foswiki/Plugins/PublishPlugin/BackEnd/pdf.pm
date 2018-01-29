@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2005-2017 Crawford Currie, http://c-dot.co.uk
+# Copyright (C) 2005-2018 Crawford Currie, http://c-dot.co.uk
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,12 +18,18 @@
 package Foswiki::Plugins::PublishPlugin::BackEnd::pdf;
 
 use strict;
-use Foswiki::Plugins::PublishPlugin::BackEnd::file;
-our @ISA = ('Foswiki::Plugins::PublishPlugin::BackEnd::file');
+use Foswiki::Plugins::PublishPlugin::BackEnd::flatfile;
+our @ISA = ('Foswiki::Plugins::PublishPlugin::BackEnd::flatfile');
 
-use constant DESCRIPTION => 'PDF file with all content in it';
+BEGIN {
+    $Foswiki::cfg{Plugins}{PublishPlugin}{PDFCmd} //=
+      $Foswiki::cfg{PublishPlugin}{PDFCmd};
+}
 
-use File::Path;
+use constant DESCRIPTION => 'PDF file with all content in it, generated using '
+  . $Foswiki::cfg{Plugins}{PublishPlugin}{PDFCmd};
+
+use File::Temp;
 
 sub new {
     my ( $class, $params, $logger ) = @_;
@@ -31,21 +37,26 @@ sub new {
     die "{Plugins}{PublishPlugin}{PDFCmd} not defined"
       unless $Foswiki::cfg{Plugins}{PublishPlugin}{PDFCmd};
 
-    $Foswiki::cfg{Plugins}{PublishPlugin}{PDFCmd} //=
-      $Foswiki::cfg{PublishPlugin}{PDFCmd};
-
-    $params->{dont_scan_existing} = 1;
+    $params->{keep}               = 0;
+    $params->{dont_scan_existing} = 0;
 
     my $this = $class->SUPER::new( $params, $logger );
 
-    $this->{file_root} = '/tmp/publish';   #File::Temp::tempdir( CLEANUP => 1 );
+    $this->{root}          = Foswiki::Func::getWorkArea('PublishPlugin');
+    $this->{relative_path} = '';
+    $this->{output}        = 'pdfdata';
 
-    $this->{pdf_path} = $this->{output_file};    # from superclass
+    # file::getReady will purge the temp dir
+
+    # Make the path to the ultimate output PDF file
+    my @path = ();
+    if ( $params->{relativedir} ) {
+        push( @path, split( /\\+/, $params->{relativedir} ) );
+    }
+    push( @path, $params->{outfile} || 'pdf' );
+
+    $this->{pdf_path} = join( '/', @path );
     $this->{pdf_path} .= '.pdf' unless $this->{pdf_path} =~ /\.\w+$/;
-    $this->{pdf_file} =
-      $this->pathJoin( $Foswiki::cfg{Plugins}{PublishPlugin}{Dir},
-        $this->{pdf_path} );
-    $this->addPath( $this->{pdf_file}, 1 );
 
     return $this;
 }
@@ -89,19 +100,25 @@ sub close {
     $ENV{HTMLDOC_DEBUG} = 1;    # see man htmldoc - goes to apache err log
     $ENV{HTMLDOC_NOCGI} = 1;    # see man htmldoc
 
-    my @flies = map { "$this->{file_root}/$_" } @{ $this->{html_files} };
     my @extras = split( /\s+/, $this->{params}->{extras} || '' );
+
+    my $pdf_file =
+      "$Foswiki::cfg{Plugins}{PublishPlugin}{Dir}/$this->{pdf_path}";
+
+    $this->addPath( $pdf_file, 1 );
 
     my ( $data, $exit ) = Foswiki::Sandbox::sysCommand(
         undef,
         $Foswiki::cfg{Plugins}{PublishPlugin}{PDFCmd},
-        FILE   => $this->{pdf_file},
-        FILES  => \@flies,
+        FILE   => $pdf_file,
+        FILES  => ["$this->{root}/$this->{output}.html"],
         EXTRAS => \@extras
     );
 
     # htmldoc fails a lot, so log rather than dying
-    $this->{logger}->logError("htmldoc failed: $exit/$data/$@") if $exit;
+    $this->{logger}->logError(
+        "$Foswiki::cfg{Plugins}{PublishPlugin}{PDFCmd} failed: $exit/$data/$@")
+      if $exit;
 
     return $this->{pdf_path};
 }

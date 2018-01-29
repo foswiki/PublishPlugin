@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2005-2017 Crawford Currie, http://c-dot.co.uk
+# Copyright (C) 2005-2018 Crawford Currie, http://c-dot.co.uk
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -29,25 +29,37 @@ use File::Copy ();
 use File::Path ();
 
 use constant DESCRIPTION =>
-"Generates a directory tree on the server containing an HTML file for each topic, and copies of all published attachments. If you have selected =copyexternal=, then copied resources will be stored in a top level =_rsrc= directory.";
+"Generates a directory tree on the server containing an HTML file for each topic, and copies of all published attachments. If you have selected =copyexternal=, then copied resources will be stored in a =_rsrc= directory at the root of the generated output.";
 
 sub new {
     my ( $class, $params, $logger ) = @_;
 
     my $this = $class->SUPER::new( $params, $logger );
 
-    # See param_schema for information about outfile and relativedir
-    $this->{output_file} = $params->{relativedir} || '';
-    $this->{output_file} =
-      $this->pathJoin( $this->{output_file}, $params->{outfile} )
-      if $params->{outfile};
+    # Kept for compactness.
+    $this->{root} = $Foswiki::cfg{Plugins}{PublishPlugin}{Dir};
 
-    # The root of the directory structure we are writing to.
-    $this->{file_root} =
-      $this->pathJoin( $Foswiki::cfg{Plugins}{PublishPlugin}{Dir},
-        $this->{output_file} );
-    $this->{logger}->logDebug( '', 'Publishing to ', $this->{file_root} );
+    # Path below {root} to the output.
+    my @path = ();
+    if ( $params->{relativedir} ) {
+        $this->{relative_path} = $params->{relativedir};
+    }
+    else {
+        $this->{relative_path} = '';
+    }
+    $this->{output} = $params->{outfile} || 'file';
+    $this->{output} .= '/';
 
+    # Path under {root}{relative_path}{output} to save external resources to
+    $this->{resource_path} = "_rsrc";
+
+    $this->{logger}->logDebug(
+        '',
+        'Publishing to ',
+        "$this->{root}/$this->{relative_path}/$this->{output}"
+    );
+
+    # Initialise the resource unique ID's
     $this->{resource_id} = 0;
 
     # List of web.topic paths to already-published topics.
@@ -60,19 +72,23 @@ sub new {
     # final generated path for the HTML. This *may* look like the
     # web.topic path, but that cannot be assumed as getTopicPath may
     # have changed it significantly.
+    return $this;
+}
 
-    if ( !$params->{keep} || $params->{keep} eq 'nothing' ) {
+sub getReady {
+    my $this = shift;
+
+    if ( !$this->{params}->{keep} || $this->{params}->{keep} eq 'nothing' ) {
 
         # Don't keep anything
-        File::Path::rmtree( $this->{file_root} );
+        File::Path::rmtree(
+            "$this->{root}/$this->{relative_path}/$this->{output}");
     }
-    elsif ( !$params->{dont_keep_existing} ) {
+    elsif ( !$this->{params}->{dont_keep_existing} ) {
 
         # See what's worth keeping
         $this->_scanExistingHTML('');
     }
-
-    return $this;
 }
 
 # Find existing HTML in published dir structure to add to sitemap and act
@@ -81,17 +97,17 @@ sub new {
 sub _scanExistingHTML {
     my ( $this, $w ) = @_;
     my $d;
-    return unless ( opendir( $d, "$this->{file_root}/$w" ) );
+    my $root = "$this->{root}/$this->{relative_path}/$this->{output}/";
+    return unless ( opendir( $d, "$root$w" ) );
     while ( my $f = readdir($d) ) {
         next if $f =~ /^\./;
-        if ( -d "$this->{file_root}/$w/$f" ) {
+        if ( -d "$root$w/$f" ) {
             $this->_scanExistingHTML( $w ? "$w/$f" : $f );
         }
         elsif ( $w && $f =~ /^\.html$/ ) {
-            my $p = "$w/$f";    # path relative to file_root
+            my $p = "$w/$f";    # path relative to $root
             push( @{ $this->{html_files} }, $p );
-            $this->{last_published}->{$p} =
-              ( stat("$this->{file_root}/$p") )[9];
+            $this->{last_published}->{$p} = ( stat("$root$p") )[9];
         }
     }
     closedir($d);
@@ -152,13 +168,13 @@ sub param_schema {
         },
         googlefile => {
             desc =>
-'Google HTML verification file name (see https://sites.google.com/site/webmasterhelpforum/en/verification-specifics)',
+              'Comma-separated list of Google HTML verification file names.',
             default   => '',
             validator => \&validateFilename
         },
         relativedir => {
             desc =>
-'Additional path components to put above the top of the published output. See [[%SYSTEMWEB%.PublishPlugin#PublishToTopic][here]] for one way this can be used.',
+'Additional path components to put between the {PublishPlugin}{Dir} and the top of the published output. See [[%SYSTEMWEB%.PublishPlugin#PublishToTopic][here]] for one way this can be used.',
             default   => '',
             validator => \&validatePath
         },
@@ -178,15 +194,6 @@ sub param_schema {
     };
 }
 
-# Implement Foswiki::Plugins::PublishPlugin::BackEnd
-sub getTopicPath {
-    my ( $this, $web, $topic ) = @_;
-
-    my @path = split( /\/+/, $web );
-    push( @path, $topic . '.html' );
-    return $this->pathJoin(@path);
-}
-
 # Implement  Foswiki::Plugins::PublishPlugin::BackEnd
 sub alreadyPublished {
     my ( $this, $web, $topic ) = @_;
@@ -196,6 +203,15 @@ sub alreadyPublished {
     my ($cd) = Foswiki::Func::getRevisionInfo( $web, $topic );
     return 0 unless $cd;
     return $cd <= $pd;
+}
+
+# Implement Foswiki::Plugins::PublishPlugin::BackEnd
+sub getTopicPath {
+    my ( $this, $web, $topic ) = @_;
+
+    my @path = split( /\/+/, $web );
+    push( @path, $topic . '.html' );
+    return join( '/', @path );
 }
 
 # Implement  Foswiki::Plugins::PublishPlugin::BackEnd
@@ -208,26 +224,33 @@ sub addTopic {
 }
 
 # Implement Foswiki::Plugins::PublishPlugin::BackEnd
+sub getAttachmentPath {
+    my ( $this, $web, $topic, $attachment ) = @_;
+
+    my @path = split( /\/+/, $web );
+    push( @path, $topic . '.attachments' );
+    push( @path, $attachment );
+    return join( '/', @path );
+}
+
+# Implement Foswiki::Plugins::PublishPlugin::BackEnd
 sub addAttachment {
     my ( $this, $web, $topic, $attachment, $data ) = @_;
 
-    my $path =
-      $this->pathJoin( $this->getTopicPath( $web, "$topic.attachments" ),
-        $attachment );
+    my $path = $this->getAttachmentPath( $web, $topic, $attachment );
     return $this->addByteData( $path, $data );
 }
 
 # Implement Foswiki::Plugins::PublishPlugin::BackEnd
 sub addResource {
-    my ( $this, $data, $name ) = @_;
+    my ( $this, $data, $ext ) = @_;
     my $prefix = '';
-    my $ext    = '';
     if ( $ext =~ /(.*)(\.\w+)$/ ) {
         $prefix = $1 // '';
         $ext = $2;
     }
     $this->{resource_id}++;
-    my $path = "_rsrc/$prefix$this->{resource_id}$ext";
+    my $path = "$this->{resource_path}/$prefix$this->{resource_id}$ext";
     return $this->addByteData( $path, $data );
 }
 
@@ -244,11 +267,14 @@ sub addPath {
 }
 
 # Abstracted for subclasses to override
-# Both $file and $data must be byte data - long characters will
-# break many engines.
+# Add a file of byte data at a relative path in the archive.
+#    * =$file= - path to file within the archive (no leading /)
+#    * =$data= - byte data to store in the file - long characters will
+#      break many engines.
 sub addByteData {
     my ( $this, $file, $data ) = @_;
-    my $fn = "$this->{file_root}/$file";
+    my $fn =
+"$Foswiki::cfg{Plugins}{PublishPlugin}{Dir}/$this->{relative_path}/$this->{output}$file";
     $this->addPath( $fn, 1 );
     my $fh;
     unless ( open( $fh, ">", $fn ) ) {
@@ -272,7 +298,7 @@ sub close {
 
     Foswiki::Func::loadTemplate('PublishPlugin');
 
-    # write sitemap.xml
+    # write sitemap.xml at the root of the archive
     my $smurl  = Foswiki::Func::expandTemplate('PublishPlugin:sitemap_url');
     my $smurls = join( "\n",
         map { my $x = $smurl; $x =~ s/%URL%/$_/g; $x }
@@ -293,29 +319,33 @@ sub close {
         }
     }
 
-    # Write default.htm and index.html
-    my $html = Foswiki::Func::expandTemplate('PublishPlugin:redirect');
+    # Write default.htm and index.html at the root of the archive
+    my $html;
     if ( $this->{params}->{defaultpage} ) {
-        my @wt =
-          Foswiki::Func::normalizeWebTopicName( undef,
-            $this->{params}->{defaultpage} );
-        my $mtag = "<meta http-equiv=\"REFRESH\" content=\"0; url="
-          . $this->getTopicPath(@wt) . "\" />";
-        $html =~ s/%HEAD%/$mtag/g;
-        $html =~ s/%BODY%/$this->{params}->{defaultpage} - please wait/g;
+        $html = Foswiki::Func::expandTemplate('PublishPlugin:index_redirect');
+        my $wt = $this->getTopicPath(
+            Foswiki::Func::normalizeWebTopicName(
+                undef, $this->{params}->{defaultpage}
+            )
+        );
+        $html =~ s/%REDIR_URL%/$wt/g;
     }
     else {
-        $html =~ s/%HEAD%//g;
-        my $bod = join( "</br>\n",
-            map { "<a href='$_'>$_</a>" } @{ $this->{html_files} } );
-        $html =~ s/%BODY%/$bod/g;
+        $html = Foswiki::Func::expandTemplate('PublishPlugin:index_list');
+        my $link = Foswiki::Func::expandTemplate('PublishPlugin:index_link');
+        my $bod  = join( '',
+            map { my $x = $link; $x =~ s/%URL%/$_/g; $x }
+              @{ $this->{html_files} } );
+        $html =~ s/%LINK_LIST%/$bod/g;
     }
+
+    $html = Foswiki::Func::expandCommonVariables($html);
     $html = Encode::encode_utf8($html);
     $this->addByteData( 'default.htm', $html );
     $this->addByteData( 'index.html',  $html );
 
-    return $this->{output_file};
+    # Return path to the directory at the root relative to {PublishPlugin}{Dir}
+    return "$this->{relative_path}/$this->{output}";
 }
 
 1;
-

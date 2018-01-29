@@ -262,13 +262,15 @@ sub _loadParams {
             $k       = $spec->{renamed};
             $spec    = $schema{$k};
             $renamed = 1;
+
+            #print STDERR "Rename $ok to $k\n";
         }
 
         next if defined $opt{$k};
 
         ASSERT( defined $spec->{validator}, $k ) if DEBUG;
 
-        if ( !defined $v && defined $spec->{default} ) {
+        if ( !defined $v && defined $spec->{default} && !$renamed ) {
 
             #print STDERR "Default $ok to '$spec->{default}'\n";
             $v = $spec->{default};
@@ -590,6 +592,8 @@ TEXT
 
     $this->{archive} = $this->{generator}->new( $this->{opt}, $this );
 
+    $this->{archive}->getReady();
+
     # Force static context for all published topics
     Foswiki::Func::getContext()->{static} = 1;
 
@@ -701,7 +705,7 @@ sub logInfo {
 
 sub logDebug {
     my $this = shift;
-    return unless $this->{params}->{debug};
+    return unless $this->{opt}->{debug};
     $this->_log( 'debug', '', @_ );
 }
 
@@ -968,15 +972,16 @@ sub _rewriteTag {
     my $new = $this->_processURL( $attrs{$key} );
     unless ( $new eq $attrs{$key} || $new =~ /^#/ ) {
 
-#print STDERR "Rewrite $new (rel to ".$this->{archive}->getTopicPath( $web, $topic ).') ';
+        #$this->logDebug("Rewrite $new (rel to ",
+        #   $this->{archive}->getTopicPath( $web, $topic ).')');
         $new =
-          File::Spec->abs2rel( $new,
-            $this->{archive}->getTopicPath( $web, $topic ) . '/..' );
+          File::Spec->abs2rel( "/$new",
+            '/' . $this->{archive}->getTopicPath( $web, $topic ) . "/.." );
 
-        #print STDERR "as $new\n";
+        #$this->logDebug("as $new");
     }
 
-    #print STDERR "$attrs{$key} = $new\n";
+    #$this->logDebug("$attrs{$key} = $new");
     $attrs{$key} = $new;
 
     return
@@ -1148,11 +1153,7 @@ sub _processURL {
         $is_script = 1;
     }
 
-    unless ($upath) {
-        return $url;
-    }
-
-    #print STDERR "- leaving ".join('/',@$upath)."\n";
+    #$this->logDebug( "- leaving ".join('/',@$upath));
 
     my $web;
     my $topic;
@@ -1178,6 +1179,7 @@ sub _processURL {
     }
     else {
         # Otherwise we have to process it as an external resource
+        $this->logDebug("- external resource");
         $new = $this->_processExternalResource($url);
     }
 
@@ -1236,7 +1238,7 @@ sub _processExternalResource {
 
     my $response = Foswiki::Func::getExternalResource($url);
     if ( $response->is_error() ) {
-        $this->logError("$url is not fetchable");
+        $this->logWarn("$url is not fetchable");
         return $url;
     }
 
@@ -1256,7 +1258,7 @@ __END__
 # Copyright (C) 2001 Motorola
 # Copyright (C) 2001-2007 Sven Dowideit, svenud@ozemail.com.au
 # Copyright (C) 2002, Eric Scouten
-# Copyright (C) 2005-2008 Crawford Currie, http://c-dot.co.uk
+# Copyright (C) 2005-2018 Crawford Currie, http://c-dot.co.uk
 # Copyright (C) 2006 Martin Cleaver, http://www.cleaver.org
 # Copyright (C) 2010 Arthur Clemens, http://visiblearea.com
 # Copyright (C) 2010 Michael Tempest

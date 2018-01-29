@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2005-2017 Crawford Currie, http://c-dot.co.uk
+# Copyright (C) 2005-2018 Crawford Currie, http://c-dot.co.uk
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -34,20 +34,27 @@ sub new {
     die $@ if $@;
 
     $params->{dont_scan_existing} = 1;
+
     my $this = $class->SUPER::new( $params, $logger );
 
     $this->{zip} = Archive::Zip->new();
 
-    $this->{zip_path} = $this->{output_file};    # from superclass
-    $this->{zip_path} .= '.zip' unless $this->{zip_path} =~ /\.\w+$/;
+    my $zf = $params->{outfile} || 'zip';
+    $zf .= '.zip' unless $zf =~ /\.\w+$/;
+    my @path = ();
+    if ( $params->{relativedir} ) {
+        push( @path, split( /\/+/, $params->{relativedir} ) );
+    }
+    push( @path, $zf );
+
+    $this->{zip_path} = join( '/', @path );
     $this->{zip_file} =
-      $this->pathJoin( $Foswiki::cfg{Plugins}{PublishPlugin}{Dir},
-        $this->{zip_path} );
-    $this->addPath( $this->{zip_file}, 1 );
+      join( '/', $Foswiki::cfg{Plugins}{PublishPlugin}{Dir}, @path );
 
     return $this;
 }
 
+# Override Foswiki::Plugins::PublishPlugin::BackEnd::file
 sub param_schema {
     my $class = shift;
     my $base  = $class->SUPER::param_schema();
@@ -56,6 +63,7 @@ sub param_schema {
     return $base;
 }
 
+# Override Foswiki::Plugins::PublishPlugin::BackEnd::file
 sub addByteData {
     my ( $this, $file, $data ) = @_;
     $this->{logger}->logError("Error adding $file")
@@ -63,6 +71,11 @@ sub addByteData {
     return $file;
 }
 
+# Override Foswiki::Plugins::PublishPlugin::BackEnd::file
+sub addPath {
+}
+
+# Override Foswiki::Plugins::PublishPlugin::BackEnd::file
 sub close {
     my $this = shift;
 
