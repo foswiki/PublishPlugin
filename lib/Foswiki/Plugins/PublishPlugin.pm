@@ -13,7 +13,7 @@ use Error qw( :try );
 use Assert;
 
 our $VERSION = '3.4';
-our $RELEASE = '29 Jan 2018';
+our $RELEASE = '30 Jan 2018';
 our $SHORTDESCRIPTION =
 'Generate static output (HTML, PDF) optionally upload (FTP) the output to a publishing site.';
 
