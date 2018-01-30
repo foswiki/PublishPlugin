@@ -1,6 +1,22 @@
 %{ This is the default publishing template }%
+<!DOCTYPE html><html lang="en">
+<head>
+<title><nop>%BASETOPIC%%TMPL:P{"titlesep"}%%BASEWEB%%TMPL:P{"titlesep"}%<nop>%WIKITOOLNAME%</title>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1.5, user-scalable=yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<link rel="icon" href="%FAVICON%" type="image/x-icon" /> <link rel="shortcut icon" href="%FAVICON%" type="image/x-icon" />
+<link rel='alternate' href='%SCRIPTURLPATH{"edit" topic="%BASEWEB%.%BASETOPIC%" t="%GMTIME{"$epoch"}%"}%' type='application/x-wiki' title='edit %BASETOPIC%' />
+<meta name="description" content="%TOPIC%" />
+</head>
+<body>
 %TEXT%
 ---
 %META{"form}%
 ---
 %META{"attachments"}%
+</body>

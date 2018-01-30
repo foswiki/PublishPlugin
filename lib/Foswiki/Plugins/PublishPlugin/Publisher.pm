@@ -1278,7 +1278,7 @@ sub _processExternalResource {
 
     my $response = Foswiki::Func::getExternalResource($url);
     if ( $response->is_error() ) {
-        $this->logWarn("$url is not fetchable");
+        $this->logWarn("=$url= is not fetchable");
         return $url;
     }
 

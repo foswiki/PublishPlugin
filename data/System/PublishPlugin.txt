@@ -18,8 +18,9 @@ _This is the most complete publishing solution for Foswiki._
 
 <img src="%ATTACHURLPATH%/publish.gif" style="float:right" alt="" />
 !PublishPlugin provides support for the generation of stand-alone HTML
-from a web. It will generate fully rendered versions of a set of
-Foswiki pages together with any attached files.
+from a Foswiki installation. It will generate fully rendered versions of
+a set of Foswiki pages together with any attached files, and (optionally)
+any external resources referenced.
 
 %TOC%
 
@@ -35,33 +36,32 @@ To address these requirements the PublishPlugin supports the generation of sever
 
 ---++ Features
    * All standard Foswiki macros are interpreted, and plugins are called
-   * Topic links internal to the wiki are translated to relative links
    * Powerful support for choosing what content gets published
-   * Any links to the 'pub' areas of topics in the web are automatically resolved, and the referenced files copied
-   * Any links to images outside the wiki are resolved, and the image is stored in the output (requires LWP)
+   * Full support for hierarchical webs
+   * Any links to the 'pub' areas of topics in the web are automatically
+    resolved, and the referenced files copied
+   * Any links to resource outside the wiki are resolved, and a snapshot
+     of the resource is stored in the output
    * Output in HTML or PDF
    * HTML can be compressed in different archive formats
    * Incremental output of HTML for efficient incremental publishing
-   * Full support for hierarchical webs
    * Format-specific skins (such as viewpdf) can be specified
-   * Able to publish HTML and referenced files directly to a remote server via ftp
+   * Able to upload directly to a remote server via ftp
    * Complete history of what was published, and when
    * Fully compatible with [[Foswiki:Extensions.BookmakerPlugin][BookmakerPlugin]]
 
 ---++ Usage
 The plugin can be used in a number of different ways:
-   * Via the Publish Form on this page
-   * Using a crafted =rest= call
+   * Via the Publish Form on this page (recommended)
+   * From the command line (recommended)
    * From a re-usable configuration topic
-   * From the command line
    * Using [[Foswiki:Extensions.BookmakerPlugin][BookmakerPlugin]] (if installed)
    
 ---+++ Publish Form
-The quickest way to publish is by completing the following form.
+The quickest way to publish is by filling in the following form.
 
-The output is generated in a directory designated during
-installation. The progress messages printed during documentation
-generation tell you exactly where the output is. Admins can use the
+The output is always generated in a directory designated during
+installation. Admins can use the
 PublishPluginControlCentre to manage the published output.
 
 Publishing is an access-controlled process; before you can publish,
@@ -480,11 +480,11 @@ the directory specified by the ={Plugins}{PublishPlugin}{Dir}= [[%SCRIPTURL{conf
 manage the contents of this directory from the browser using the
 =%<nop>PUBLISHERS_CONTROL_CENTRE%= macro (see PublishPluginControlCentre).
 
-If _relativedir_ is set, then it will be added to ={Plugins}{PublishPlugin}{Dir}=.
+If _relativedir_ is set, then it will be added after ={Plugins}{PublishPlugin}{Dir}=. See [[#PublishToTopic][How to attach the output to a Topic]] for an example of how to use this.
 
 If _outfile_ is not set in the parameters it defaults to the name of the format being published.
 
-Most formats generate a single file with a unique extension that identifies the format e.g. =.pdf=. When publishing a format that generates multiple files (e.g. =file=) then _oufile_ will be a directory.
+Most formats generate a single file with a unique extension that identifies the format e.g. =.pdf=. When publishing a format that generates multiple files (e.g. =file=) then _outfile_ will normally be a directory.
 
 %X% The rendered data can get pretty big, and the publishing process itself puts a heavy load on the server, especially when using compression on large webs.
 
@@ -547,13 +547,17 @@ apply.
    * The =compress= parameter has been removed.
    * The &lt;nopublish> tag has been removed.
    * The =templates= parameter has been removed. We couldn't find anyone who was using it. The =template= parameter provides a subset of it's functionality.
-   * The =file= generator no longer deletes existing published content before publishing.
+   * Deletion of existing published content before publishing is now under the
+     control of the =keep= parameter.
    * The =web=, =topiclist=, =exclusions= and =inclusions= parameters are still supported, but are undocumented and will be removed in a later version. They are ignored if =topics= is given. 
 
 ---++ Change History
 
 %TABLE{columnwidths="10em" tablewidth="100%"}%
-|  3.4 (29 Jan 2018) | Fixes for various problems, and added flatdir generator |
+|  3.4 (30 Jan 2018) | Foswikitask:Item14611: flatdir generator, Foswikitask:Item14612: add support for handling external resources, Foswikitask:Item14613: Foswikitask:Item14613: improve format UI, Foswikitask:Item14513: add HTML to basic_publish skin |
+|  3.3 (26 Jan 2018) | Foswikitask:Item14540: correct internal resource resolution Foswikitask:Item14610: re-implement defaultpage |
+|  3.2 (23 Jan 2018) | Foswikitask:Item14609: fix for subweb names |
+|  3.1 (23 Apr 2017) | Foswikitask:Item14421: Foswikitask:Item14422: bugfix release |
 |  3.0 (22 Apr 2017) | Crawford Currie extensively rewrote to separate concerns and get rid of some of the poor code that had crept in over the years. Removed ability to publish several templates in one go, due to performance and complexity concerns. Removed flatpdf format, as it's pretty useless with modern htmldoc. Deprecated =web=, =topiclist=, =inclusions=, =exclusions= and simplified to one parameter, =topics=, renamed =topicsearch= to =rexclude= and =skin= to =publishskin=. WARNING: untested on Foswiki <2 |
 |  2.5 (25 Jan 2017) | Update to work with Foswiki 2.x.  Foswikitask:Item14198 Foswikitask:Item11808 Foswikitask:Item8898  |
 |  2.4 (30 Jul 2012) | Foswikitask:Item12016 Add capability to construct flat HTML and PDF files. Bugfixes: Foswikitask:Item11988 Foswikitask:Item11339 Foswikitask:Item11345 Foswikitask:Item8260 Foswikitask:Item10597 Foswikitask:Item11346 |
