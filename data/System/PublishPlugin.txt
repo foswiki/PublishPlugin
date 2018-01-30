@@ -363,9 +363,15 @@ Enable to get a lot of debug messages, mainly relating to the processing of URL.
       </tr>
       <tr>
         <td colspan=4>
-          %TABPANE%
-%PUBLISHING_GENERATORS{format="$percentTAB{$quot$name$quot}$percent$help<p/><input type='radio' name='format'$percentIF{$quot$format='$name'$quot then=$quot checked='checked'$quot}$percent value='$name'> Select this format<table>$params=(<tr><td> =$pname= </td><td><input type='text' size=30 name='$name_$pname' value='$pdefault'/></td><td>$phelp</td></tr>)</table>$percentENDTAB$percent"}%
-          %ENDTABPANE%
+<input type='text' id="format_picker" name='format' value="%URLPARAM{"format" default="file"}%" style="display:none">
+%TABPANE{select="%URLPARAM{"format" default="file"}%"}%
+%PUBLISHING_GENERATORS{format="$percentTAB{$quot$name$quot before=$quotdocument.forms['publish'].format.value='$name'$quot id=$quot$name$quot}$percent$help<p/><table>$params=(<tr><td> =$pname= </td><td><input type='text' size=30 name='$name_$pname' value='$pdefault'/></td><td>$phelp</td></tr>)</table>$percentENDTAB$percent"}%
+%ENDTABPANE%
+<!--
+<select>
+%<nop>PUBLISHING_GENERATORS{format="<option name='format'>$name</option>"}%<nop>
+</select>
+%<nop>PUBLISHING_GENERATORS{format="<h3> =$name= </h3><p>$help</p><table>$params=(<tr><td> =$pname= </td><td><input type='text' size=30 name='$name_$pname' value='$pdefault'/></td><td>$phelp</td></tr>)</table>"}%<nop>-->
         </td>
       </tr>
       <!-- SUBMIT -->
