@@ -554,7 +554,7 @@ apply.
 ---++ Change History
 
 %TABLE{columnwidths="10em" tablewidth="100%"}%
-|  3.4 (30 Jan 2018) | Foswikitask:Item14611: flatdir generator, Foswikitask:Item14612: add support for handling external resources, Foswikitask:Item14613: Foswikitask:Item14613: improve format UI, Foswikitask:Item14513: add HTML to basic_publish skin |
+|  3.4 (30 Jan 2018) | Foswikitask:Item14611: flatdir generator, Foswikitask:Item14612: add support for handling external resources, Foswikitask:Item14613: Foswikitask:Item14613: improve format UI, Foswikitask:Item14513: add HTML to basic_publish skin Foswikitask:Item14614: support parameters passed to resource URLs |
 |  3.3 (26 Jan 2018) | Foswikitask:Item14540: correct internal resource resolution Foswikitask:Item14610: re-implement defaultpage |
 |  3.2 (23 Jan 2018) | Foswikitask:Item14609: fix for subweb names |
 |  3.1 (23 Apr 2017) | Foswikitask:Item14421: Foswikitask:Item14422: bugfix release |

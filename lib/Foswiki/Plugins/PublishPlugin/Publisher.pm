@@ -1150,22 +1150,27 @@ sub _processURL {
         };
     }
 
-    my ( $is_script, $is_pub, $upath ) = ( 0, 0 );
+    my ( $type, $is_rel, $upath ) = ( 0, 0 );
+
+    # Match pub first, because some forms of pub link (viewfile) will
+    # also match script.
     if ( $upath = _match( 1, $url, $this->{url_paths}->{pub_abs} ) ) {
         $this->logDebug( "- matched pub_abs at " . join( '/', @$upath ) );
-        $is_pub = 1;
+        $type = 'pub';
     }
     elsif ( $upath = _match( 0, $url, $this->{url_paths}->{pub_rel} ) ) {
         $this->logDebug( "- matched pub_rel at " . join( '/', @$upath ) );
-        $is_pub = 1;
+        $type   = 'pub';
+        $is_rel = 1;
     }
     elsif ( $upath = _match( 1, $url, $this->{url_paths}->{script_abs} ) ) {
         $this->logDebug( "- matched script_abs at " . join( '/', @$upath ) );
-        $is_script = 1;
+        $type = 'script';
     }
     elsif ( $upath = _match( 0, $url, $this->{url_paths}->{script_rel} ) ) {
         $this->logDebug( "- matched script_rel at " . join( '/', @$upath ) );
-        $is_script = 1;
+        $type   = 'script';
+        $is_rel = 1;
     }
 
     #$this->logDebug( "- leaving ".join('/',@$upath));
@@ -1175,14 +1180,14 @@ sub _processURL {
     my $attachment;
     my $new = $url;
 
-    # Is it an internal resource?
-    if ($is_pub) {
+    # Is it a pub resource? With no associated query?
+    if ( $type eq 'pub' && !$url->query() ) {
         $attachment = pop(@$upath) if scalar(@$upath);
         $topic      = pop(@$upath) if scalar(@$upath);
         $web = join( '/', @$upath );
         $new = $this->_processInternalResource( $web, $topic, $attachment );
     }
-    elsif ($is_script) {
+    elsif ( $type eq 'script' ) {
 
         # return a link to the topic in the archive. This is named
         # for the template being generated.
@@ -1215,8 +1220,27 @@ sub _processURL {
         }
     }
     else {
-        # Otherwise we have to process it as an external resource
+        # Otherwise it's either a real external resource, or a
+        # pub resource with a query. In either case we have to
+        # process it as an external resource
         $this->logDebug("- external resource");
+
+        if ( $type eq 'pub' && $is_rel ) {
+
+            # Relative URLs with queries can't be retrieved using
+            # Foswiki::Func::getExternalResource; but it works if
+            # we convert to an absolute URL, which we can do safely.
+            $attachment = pop(@$upath) if scalar(@$upath);
+            $topic      = pop(@$upath) if scalar(@$upath);
+            $web = join( '/', @$upath );
+            $url = URI->new(
+                Foswiki::Func::getPubUrlPath( $web, $topic, $attachment,
+                    absolute => 1 )
+                  . '?'
+                  . $url->query()
+            );
+        }
+
         $new = $this->_processExternalResource($url);
     }
 
@@ -1278,7 +1302,7 @@ sub _processExternalResource {
 
     my $response = Foswiki::Func::getExternalResource($url);
     if ( $response->is_error() ) {
-        $this->logWarn("=$url= is not fetchable");
+        $this->logWarn( "Could not get =$url=, ", $response->message() );
         return $url;
     }
 
