@@ -144,6 +144,35 @@ in the wiki will automatically be followed, and those topics published as well.
         </td>
       </tr>
       <tr>
+        <td class="nameCol">
+          Unpublished Topics
+        </td>
+        <td class="inputCol">
+          <select name="unpublished" class="foswikiInputField" value="%URLPARAM{"unpublished" default="" encode="entity"}%"/>
+          <option>rewrite</option>
+          <option>follow</option>
+          <option>404</option>
+          <option>ignore</option>
+          </select>
+        </td>
+        <td class="infoCol">
+        Sometimes links to topics that are not selected by the =topics=
+        parameter may be found during publishing. You can choose how these
+        links will be handled:
+   * =rewrite= (the default) - the link will be processed as if the topic
+     was being published
+   * =follow= - the link will be rewritten and the most recent version of the
+     topic referred to in the link will itself be published,
+   * =404= - the link will be rewritten to ensure it is broken,
+   * =ignore= - the link will be left as a link to the wiki. Note that in
+     most cases this will leave a broken link, but may be useful for certain
+     server configurations.
+        </td>
+        <td class="paramCol">
+          =unpublished=
+        </td>
+      </tr>
+      <tr>
         <td colspan="4">
           %TWISTY{mode="div" showlink="Advanced topic selection..."}%
           <table class="foswikiTable publishForm">

@@ -102,6 +102,11 @@ my %PARAM_SCHEMA = (
         validator => \&validateRE,
         desc      => 'Content Filter'
     },
+    unpublished => {
+        default   => 'rewrite',
+        desc      => ' How to handle links to unpublished topics',
+        validator => \&validateWord
+    },
     versions => {
         validator => \&validateWebTopicName,
         desc      => 'Versions Topic'
@@ -600,7 +605,16 @@ TEXT
     my $safe = $Foswiki::cfg{ScriptUrlPaths};
     undef $Foswiki::cfg{ScriptUrlPaths};
 
-    foreach my $wt (@topics) {
+    # Complete set of topics to be published. May expand if
+    # unpublished="follow"
+    $this->{publishSet} = { map { $_ => 1 } @topics };
+
+    # Working set of topics waiting to be published. May expand if
+    # unpublished="follow"
+    $this->{publishList} = \@topics;
+
+    while ( scalar @topics ) {
+        my $wt = shift(@topics);
         try {
             $this->_publishTopic( split( /\./, $wt, 2 ) );
         }
@@ -730,7 +744,7 @@ sub _publishTopic {
       && $topic eq $this->{history}->[1];    # never publish this
 
     if ( $this->{archive}->alreadyPublished( $web, $topic ) ) {
-        $this->logInfo( "$web.$topic", ' is already up to date' );
+        $this->logInfo("$web.$topic is already up to date");
         return;
     }
 
@@ -761,7 +775,7 @@ sub _publishTopic {
     }
 
     if ( $this->{opt}->{rexclude} && $text =~ /$this->{opt}->{rexclude}/ ) {
-        $this->logInfo( "$web.$topic", "excluded by filter" );
+        $this->logInfo("$web.$topic excluded by filter");
         return;
     }
 
@@ -816,7 +830,7 @@ sub _publishTopic {
         my $alt_tmpl =
           Foswiki::Func::readTemplate( $override, $this->{opt}->{publishskin},
             $web );
-        $this->logInfo( "$web.$topic", " has a VIEW_TEMPLATE '$override'" );
+        $this->logInfo("$web.$topic has a VIEW_TEMPLATE '$override'");
         if ( length($alt_tmpl) ) {
             $tmpl = $alt_tmpl;
         }
@@ -929,7 +943,8 @@ s/<blockquote [^]*\bcite=[^>]*>/$this->_rewriteTag($&, 'cite', $web, $topic)/gei
     $tmpl =~ s/<nop>//g;
 
     # Archive the resulting HTML.
-    my $url = $this->{archive}->addTopic( $web, $topic, $tmpl );
+    my $path = $this->{archive}->addTopic( $web, $topic, $tmpl );
+    $this->logInfo("Published =$web.$topic= as =$path=");
 
     # Process any uncopied resources
     if ( $this->{opt}->{allattachments} ) {
@@ -969,7 +984,7 @@ sub _rewriteTag {
         $attrs{$1} = $3;
     }
     return $tag unless $attrs{$key};
-    my $new = $this->_processURL( $attrs{$key} );
+    my $new = $this->_processURL( $attrs{$key}, "$web.$topic" );
     unless ( $new eq $attrs{$key} || $new =~ /^#/ ) {
 
         #$this->logDebug("Rewrite $new (rel to ",
@@ -991,7 +1006,7 @@ sub _rewriteTag {
 # Rewrite a URL - be it internal or external. Internal URLs that point to
 # anything in pub, or to scripts, are always rewritten.
 sub _processURL {
-    my ( $this, $url ) = @_;
+    my ( $this, $url, $referrer ) = @_;
 
     $url = URI->new($url);
 
@@ -1170,12 +1185,34 @@ sub _processURL {
     elsif ($is_script) {
 
         # return a link to the topic in the archive. This is named
-        # for the template being generated. We do this even if the
-        # topic isn't included in the processed outout, so we may
-        # end up with broken links. C'est la guerre.
+        # for the template being generated.
+        my $rewrite = 1;
         $topic = pop(@$upath) if scalar(@$upath);
         $web = join( '/', @$upath );
-        $new = $this->{archive}->getTopicPath( $web, $topic );
+
+        unless ( $this->{publishSet}->{"$web.$topic"} ) {
+            if ( $this->{opt}->{unpublished} eq 'rewrite' ) {
+                $this->logWarn("$web.$topic is not in the publish set");
+            }
+            elsif ( $this->{opt}->{unpublished} eq 'follow' ) {
+                $this->logWarn(
+"Adding $web.$topic to the publish set, referred to from $referrer"
+                );
+                push( @{ $this->{publishList} }, "$web.$topic" );
+                $this->{publishSet}->{"$web.$topic"} = $referrer;
+            }
+            elsif ( $this->{opt}->{unpublished} eq '404' ) {
+                $rewrite = 0;
+                $new     = "broken link to $web.$topic";
+            }
+            elsif ( $this->{opt}->{unpublished} eq 'ignore' ) {
+                $this->logWarn("Ignoring link to unpublished $web.$topic");
+                $rewrite = 0;
+            }
+        }
+        if ($rewrite) {
+            $new = $this->{archive}->getTopicPath( $web, $topic );
+        }
     }
     else {
         # Otherwise we have to process it as an external resource
@@ -1223,9 +1260,12 @@ sub _processInternalResource {
     if ( $attachment =~ /\.css$/i ) {
         $data =~ s/\burl\((["']?)(.*?)\1\)/$1.$this->_processURL($2).$1/ge;
     }
-    $this->{copied_resources}->{$rsrc} =
+    my $path =
       $this->{archive}->addAttachment( $web, $topic, $attachment, $data );
-    return $this->{copied_resources}->{$rsrc};
+    $this->logInfo("Published =$web.$topic:$attachment= as =$path=");
+    $this->{copied_resources}->{$rsrc} = $path;
+
+    return $path;
 }
 
 sub _processExternalResource {
@@ -1246,10 +1286,12 @@ sub _processExternalResource {
     if ( $url =~ /(\.\w+)(\?|#|$)/ ) {
         $ext = $1;
     }
-    $this->{copied_resources}->{$url} =
-      $this->{archive}->addResource( $response->content(), $ext );
+    my $path = $this->{archive}->addResource( $response->content(), $ext );
 
-    return $this->{copied_resources}->{$url};
+    $this->logInfo("Published =$url= as =$path=");
+    $this->{copied_resources}->{$url} = $path;
+
+    return $path;
 }
 
 1;

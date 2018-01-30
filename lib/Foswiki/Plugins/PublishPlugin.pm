@@ -109,10 +109,18 @@ sub _publishRESTHandler {
             if ( $level eq 'error' ) {
                 print STDERR "ERROR ", @_, "\n";
             }
-            if ( $level ne 'info' ) {
-                $body .= "$level: ";
+            my $col = '';
+            if ( $level eq 'warn' ) {
+                $col = '%ORANGE%';
             }
-            $body .= join( '', @_ ) . " <br/>\n";
+            elsif ( $level eq 'error' ) {
+                $col = '%RED%';
+            }
+            elsif ( $level eq 'debug' ) {
+                $col = '%BLUE%';
+            }
+            my $endcol = $col ? '%ENDCOLOR%' : '';
+            $body .= join( '', $col, @_, $endcol ) . " <br/>\n";
         };
     }
 

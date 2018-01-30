@@ -288,7 +288,6 @@ sub addByteData {
         $this->{logger}->logError("$fn has no data, empty file created");
     }
     close($fh);
-    $this->{logger}->logInfo( '', 'Published ' . $file );
     return $file;
 }
 
