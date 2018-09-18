@@ -99,7 +99,6 @@ sub getAttachmentPath {
     # Default is to store attachments in a .attachments dir next to
     # the topic. That won't work for flatfile, as the topics are all
     # in one file, so whack them into the resource dir instead.
-    my ( $this, $web, $topic, $attachment, $data ) = @_;
     return "_files/" . join( '_', split( /\/+/, $web ), $topic, $attachment );
 }
 
