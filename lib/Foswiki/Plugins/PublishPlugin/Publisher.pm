@@ -682,7 +682,7 @@ TEXT
         );
         my $url = Foswiki::Func::getScriptUrl( $this->{history}->[0],
             $this->{history}->[1], 'view' );
-        $this->logInfo( "History saved in", "<a href='$url'>$url</a>" );
+        $this->logInfo( "History saved in ", "<a href='$url'>$url</a>" );
     }
 }
 
@@ -708,7 +708,7 @@ sub _log {
 
     &{ $this->{logfn} }( $level, @_ );
     $this->{historyText} .=
-      join( '', $preamble, @_, ( $preamble ? '%ENDCOLOR$' : '' ), '%BR%\n' )
+      join( '', $preamble, @_, ( $preamble ? '%ENDCOLOR%' : '' ), "%BR%\n" )
       if ( $this->{opt}->{history} );
 }
 
@@ -944,7 +944,7 @@ s/<blockquote [^]*\bcite=[^>]*>/$this->_rewriteTag($&, 'cite', $web, $topic)/gei
 
     # Archive the resulting HTML.
     my $path = $this->{archive}->addTopic( $web, $topic, $tmpl );
-    $this->logInfo("Published =$web.$topic= as =$path=");
+    $this->logInfo("Published =$web.$topic= as =$path= ");
 
     # Process any uncopied resources
     if ( $this->{opt}->{allattachments} ) {
@@ -1286,7 +1286,7 @@ sub _processInternalResource {
     }
     my $path =
       $this->{archive}->addAttachment( $web, $topic, $attachment, $data );
-    $this->logInfo("Published =$web.$topic:$attachment= as =$path=");
+    $this->logInfo("Published =$web.$topic:$attachment= as =$path= ");
     $this->{copied_resources}->{$rsrc} = $path;
 
     return $path;
@@ -1312,7 +1312,7 @@ sub _processExternalResource {
     }
     my $path = $this->{archive}->addResource( $response->content(), $ext );
 
-    $this->logInfo("Published =$url= as =$path=");
+    $this->logInfo("Published =$url= as =$path= ");
     $this->{copied_resources}->{$url} = $path;
 
     return $path;
