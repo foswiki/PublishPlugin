@@ -217,7 +217,7 @@ sub _loadParams {
     if ( &$data('configtopic') ) {
         my ( $cw, $ct ) =
           Foswiki::Func::normalizeWebTopicName( $Foswiki::cfg{UsersWebName},
-            &$data->{config_topic} );
+            &$data('configtopic') );
         my $d = _loadConfigTopic( $cw, $ct );
         $data = sub { return $d->{ $_[0] }; };
     }
