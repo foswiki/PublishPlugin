@@ -76,7 +76,9 @@ my %PARAM_SCHEMA = (
     },
     publishskin => {
         default   => 'basic_publish',
-        validator => \&validateWord,
+        validator => sub {
+                validateList( @_, \&validateWord );
+                },
         desc      => 'Publish Skin'
     },
     template => {
