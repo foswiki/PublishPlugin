@@ -1,4 +1,4 @@
-%META:TOPICINFO{author="ProjectContributor" comment="" date="1485354263" format="1.1" reprev="1" version="1"}%
+%META:TOPICINFO{author="ProjectContributor" comment="" date="1638778587" format="1.1" reprev="1" version="1"}%
 ---+!! <nop>%TOPIC%
 *Generates a static view of a web, as HTML files on disc, or as a =PDF=, or as a =zip= or =tgz= archive file, or by uploading directly to an FTP server.*
 
@@ -554,6 +554,7 @@ apply.
 ---++ Change History
 
 %TABLE{columnwidths="10em" tablewidth="100%"}%
+|  3.5 (07 Dec 2021) | Foswikitask:Item15050: Bug fix. Foswikitask:Item15051: Improve saved publishing history. Foswikitask:Item15052: Allow =cover= on =publishskin=. Foswikitask:Item15053: Improve publishing resources. |
 |  3.4 (30 Jan 2018) | Foswikitask:Item14611: flatdir generator, Foswikitask:Item14612: add support for handling external resources, Foswikitask:Item14613: Foswikitask:Item14613: improve format UI, Foswikitask:Item14513: add HTML to basic_publish skin Foswikitask:Item14614: support parameters passed to resource URLs |
 |  3.3 (26 Jan 2018) | Foswikitask:Item14540: correct internal resource resolution Foswikitask:Item14610: re-implement defaultpage |
 |  3.2 (23 Jan 2018) | Foswikitask:Item14609: fix for subweb names |
@@ -605,7 +606,7 @@ http://www.gnu.org/copyleft/gpl.html
 %META:FIELD{name="Release" title="Release" value="%25$RELEASE%25"}%
 %META:FIELD{name="Description" title="Description" value="%25$SHORTDESCRIPTION%25"}%
 %META:FIELD{name="Repository" title="Repository" value="https://github.com/foswiki/%25TOPIC%25"}%
-%META:FIELD{name="Copyright" title="Copyright" value="&copy; 2006-2017, Foswiki Contributors, &copy; 2004-2017 Crawford Currie http://c-dot.co.uk, &copy; 2002-2003, Eric Scouten., &copy;  2006 Martin Cleaver http://www.cleaver.org, &copy; 2001 Motorola. All Rights Reserved. "}%
+%META:FIELD{name="Copyright" title="Copyright" value="&copy; 2006-2021, Foswiki Contributors, &copy; 2004-2017 Crawford Currie http://c-dot.co.uk, &copy; 2002-2003, Eric Scouten., &copy;  2006 Martin Cleaver http://www.cleaver.org, &copy; 2001 Motorola. All Rights Reserved. "}%
 %META:FIELD{name="License" title="License" value="GPL ([[http://www.gnu.org/copyleft/gpl.html][GNU General Public License]])"}%
 %META:FIELD{name="Home" title="Home" value="Foswiki:Extensions/%25TOPIC%25"}%
 %META:FIELD{name="Support" title="Support" value="Foswiki:Support/%25TOPIC%25"}%

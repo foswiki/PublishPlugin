@@ -53,11 +53,11 @@ sub new {
     # Path under {root}{relative_path}{output} to save external resources to
     $this->{resource_path} = "_rsrc";
 
-    $this->{logger}->logDebug(
-        '',
-        'Publishing to ',
-        "$this->{root}/$this->{relative_path}/$this->{output}"
-    );
+    #    $this->{logger}->logDebug(
+    #        '',
+    #        'Publishing to ',
+    #        "$this->{root}/$this->{relative_path}/$this->{output}"
+    #    );
 
     # Initialise the resource unique ID's
     $this->{resource_id} = 0;

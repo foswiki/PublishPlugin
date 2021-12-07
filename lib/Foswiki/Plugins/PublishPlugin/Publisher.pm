@@ -8,6 +8,7 @@ use Foswiki::Func;
 use Error ':try';
 use Assert;
 use URI ();
+use Scalar::Util qw( blessed );
 
 require Exporter;
 our @ISA       = qw(Exporter);
@@ -77,9 +78,9 @@ my %PARAM_SCHEMA = (
     publishskin => {
         default   => 'basic_publish',
         validator => sub {
-                validateList( @_, \&validateWord );
-                },
-        desc      => 'Publish Skin'
+            validateList( @_, \&validateWord );
+        },
+        desc => 'Publish Skin'
     },
     template => {
         default   => 'view',
@@ -987,7 +988,10 @@ sub _rewriteTag {
     }
     return $tag unless $attrs{$key};
     my $new = $this->_processURL( $attrs{$key}, "$web.$topic" );
-    unless ( $new eq $attrs{$key} || $new =~ /^#/ ) {
+    unless ( ( blessed($new) && $new->eq( $attrs{$key} ) )
+        || $new eq $attrs{$key}
+        || $new =~ /^#/ )
+    {
 
         #$this->logDebug("Rewrite $new (rel to ",
         #   $this->{archive}->getTopicPath( $web, $topic ).')');
@@ -1023,6 +1027,8 @@ sub _processURL {
     # $url->frag
 
     $this->logDebug( "Processing URL ", $url );
+
+    $url->path('/') if $url->scheme() && !$url->path();
 
     if ( !defined $url->path() || length( $url->path() ) == 0 ) {
 
@@ -1141,6 +1147,12 @@ sub _processURL {
             script_abs => URI->new(
                 Foswiki::Func::getScriptUrl( 'WEB', 'TOPIC', 'SCRIPT' )
             ),
+            viewfile_rel => URI->new(
+                Foswiki::Func::getScriptUrlPath( 'WEB', 'TOPIC', 'viewfile' )
+            ),
+            viewfile_abs => URI->new(
+                Foswiki::Func::getScriptUrl( 'WEB', 'TOPIC', 'viewfile' )
+            ),
             pub_rel => URI->new(
                 Foswiki::Func::getPubUrlPath( 'WEB', 'TOPIC', 'ATTACHMENT' )
             ),
@@ -1165,6 +1177,15 @@ sub _processURL {
         $type   = 'pub';
         $is_rel = 1;
     }
+    elsif ( $upath = _match( 0, $url, $this->{url_paths}->{viewfile_abs} ) ) {
+        $this->logDebug( "- matched viewfile_abs at " . join( '/', @$upath ) );
+        $type = 'pub';
+    }
+    elsif ( $upath = _match( 0, $url, $this->{url_paths}->{viewfile_rel} ) ) {
+        $this->logDebug( "- matched viewfile_rel at " . join( '/', @$upath ) );
+        $type   = 'pub';
+        $is_rel = 1;
+    }
     elsif ( $upath = _match( 1, $url, $this->{url_paths}->{script_abs} ) ) {
         $this->logDebug( "- matched script_abs at " . join( '/', @$upath ) );
         $type = 'script';
@@ -1182,12 +1203,37 @@ sub _processURL {
     my $attachment;
     my $new = $url;
 
-    # Is it a pub resource? With no associated query?
-    if ( $type eq 'pub' && !$url->query() ) {
-        $attachment = pop(@$upath) if scalar(@$upath);
-        $topic      = pop(@$upath) if scalar(@$upath);
-        $web = join( '/', @$upath );
-        $new = $this->_processInternalResource( $web, $topic, $attachment );
+    # Is it a pub resource?
+    if ( $type eq 'pub' ) {
+        if ( !$url->query() ) {
+            $attachment = pop(@$upath) if scalar(@$upath);
+            $topic      = pop(@$upath) if scalar(@$upath);
+            $web = join( '/', @$upath );
+            $new = $this->_processInternalResource( $web, $topic, $attachment );
+        }
+        else {
+            #the attachment is versioned. Retrieve the correct version.
+            # use an absolute URL, which we can do safely.
+            my %query = $url->query_form();
+
+            if ( $query{filename} ) {
+                $attachment = delete $query{filename};
+                $url->path( $url->path() . "/$attachment" );
+            }
+
+            ### Need to make the path absolute when it is relative
+            if ($is_rel) {
+                my $base = URI->new(
+                    Foswiki::Func::getPubUrlPath(
+                        undef, undef, undef, absolute => 1
+                    )
+                );
+                ($base) = ( $base =~ m!^([^/]+//[^/]+)! );
+                $url = URI->new( $base . $url );
+            }
+
+            $new = $this->_processExternalResource($url);
+        }
     }
     elsif ( $type eq 'script' ) {
 
@@ -1222,27 +1268,10 @@ sub _processURL {
         }
     }
     else {
-        # Otherwise it's either a real external resource, or a
-        # pub resource with a query. In either case we have to
-        # process it as an external resource
+        # It's  a real external resource
         $this->logDebug("- external resource");
 
-        if ( $type eq 'pub' && $is_rel ) {
-
-            # Relative URLs with queries can't be retrieved using
-            # Foswiki::Func::getExternalResource; but it works if
-            # we convert to an absolute URL, which we can do safely.
-            $attachment = pop(@$upath) if scalar(@$upath);
-            $topic      = pop(@$upath) if scalar(@$upath);
-            $web = join( '/', @$upath );
-            $url = URI->new(
-                Foswiki::Func::getPubUrlPath( $web, $topic, $attachment,
-                    absolute => 1 )
-                  . '?'
-                  . $url->query()
-            );
-        }
-
+        return $url unless $this->{opt}->{copyexternal};
         $new = $this->_processExternalResource($url);
     }
 
@@ -1280,7 +1309,7 @@ sub _processInternalResource {
         }
         else {
             $this->logError("$src is not readable");
-            return 'MISSING RESOURCE $rsrc';
+            return "MISSING RESOURCE $rsrc";
         }
     }
     if ( $attachment =~ /\.css$/i ) {
@@ -1296,8 +1325,6 @@ sub _processInternalResource {
 
 sub _processExternalResource {
     my ( $this, $url ) = @_;
-
-    return $url unless $this->{opt}->{copyexternal};
 
     return $this->{copied_resources}->{$url}
       if ( $this->{copied_resources}->{$url} );
