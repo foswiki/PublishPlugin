@@ -603,7 +603,8 @@ TEXT
     $this->{archive}->getReady();
 
     # Force static context for all published topics
-    Foswiki::Func::getContext()->{static} = 1;
+    Foswiki::Func::getContext()->{static} = 1
+       if  $this->{opt}->{format} eq 'pdf';
 
     my $safe = $Foswiki::cfg{ScriptUrlPaths};
     undef $Foswiki::cfg{ScriptUrlPaths};
@@ -1201,39 +1202,33 @@ sub _processURL {
     my $web;
     my $topic;
     my $attachment;
+    my $rev;
     my $new = $url;
 
     # Is it a pub resource?
+    #Item15055: 
+    # Abandoning the retrieval of pub resources  with query as external
+    # readAttachment supports versioned attachments.
+    # other parameters must be handled by the pub resource
+    # - in the wiki,as well as
+    # -in the published resource.
     if ( $type eq 'pub' ) {
-        if ( !$url->query() ) {
-            $attachment = pop(@$upath) if scalar(@$upath);
-            $topic      = pop(@$upath) if scalar(@$upath);
-            $web = join( '/', @$upath );
-            $new = $this->_processInternalResource( $web, $topic, $attachment );
-        }
-        else {
-            #the attachment is versioned. Retrieve the correct version.
-            # use an absolute URL, which we can do safely.
+        if ( $url->query() ) {
             my %query = $url->query_form();
-
-            if ( $query{filename} ) {
-                $attachment = delete $query{filename};
-                $url->path( $url->path() . "/$attachment" );
-            }
-
-            ### Need to make the path absolute when it is relative
-            if ($is_rel) {
-                my $base = URI->new(
-                    Foswiki::Func::getPubUrlPath(
-                        undef, undef, undef, absolute => 1
-                    )
-                );
-                ($base) = ( $base =~ m!^([^/]+//[^/]+)! );
-                $url = URI->new( $base . $url );
-            }
-
-            $new = $this->_processExternalResource($url);
+            
+            $attachment = $query{filename} ? delete $query{filename} : pop(@$upath);
+            $rev = $query{rev} ? delete $query{rev} : undef();
+            $url->query_form( \%query );
         }
+        else{
+            $attachment = pop(@$upath) if scalar(@$upath);
+            $rev = undef();
+        }
+        $topic      = pop(@$upath) if scalar(@$upath);
+        $web = join( '/', @$upath );
+        $new = $this->_processInternalResource( $web, $topic, $attachment, $rev );
+        $new = $new.'?'.$url->query() if $url->query();
+ 
     }
     elsif ( $type eq 'script' ) {
 
@@ -1282,7 +1277,7 @@ sub _processURL {
 # Copy a resource from pub (image, style sheet, etc.) to
 # the archive. Return the path to the copied resource in the archive.
 sub _processInternalResource {
-    my ( $this, $web, $topic, $attachment ) = @_;
+    my ( $this, $web, $topic, $attachment, $rev ) = @_;
 
     my $rsrc = join( '/', $web, $topic, $attachment );
 
@@ -1293,12 +1288,38 @@ sub _processInternalResource {
     my $data;
 
     # See it it's an attachment
-    if ( Foswiki::Func::attachmentExists( $web, $topic, $attachment ) ) {
-        $data = Foswiki::Func::readAttachment( $web, $topic, $attachment );
+    my $d1 = Foswiki::Func::webExists( $web );
+    my $d2 = Foswiki::Func::attachmentExists( $web, $topic, $attachment );
+#    if ( Foswiki::Func::attachmentExists( $web, $topic, $attachment ) ) {
+    if ( $d1 && $d2 ) {
+        $data = Foswiki::Func::readAttachment( $web, $topic, $attachment, $rev );
     }
     else {
+        # an unusual attachment;
+        my @webTopic = split '/', $web.'/'.$topic;
+        my @web = ( );
+        foreach my $i ( 0 .. $#webTopic) {
+            if (Foswiki::Func::webExists( join( '/', @web, $webTopic[$i] ) ) ) {
+                push @web, shift @webTopic;
+            }
+            else {
+                last;
+            }
+        }
+        $web = join '/', @web;
+        $topic = shift @webTopic;
+        $attachment = join '/', @webTopic, $attachment;
+print STDERR "WEB: $web\nTOPIC: $topic\nATTACHMENT: $attachment\n";
+####        if ( Foswiki::Func::attachmentExists( $web, $topic, $attachment ) ) {
+        $data = Foswiki::Func::readAttachment( $web, $topic, $attachment, $rev );
+ ###        }
+        unless( $data) {
+            $this->logError("$web\.$topic:$attachment is not readable");
+            return "MISSING RESOURCE $rsrc";
+        }
         # Not an attachment - pull on our muddy boots and puddle
         # around in directories - if they exist!
+      if (1 == 0) {
         my $pubDir = Foswiki::Func::getPubDir();
         my $src    = "$pubDir/$rsrc";
         if ( open( my $fh, '<', $src ) ) {
@@ -1307,10 +1328,8 @@ sub _processInternalResource {
             $data = <$fh>;
             close($fh);
         }
-        else {
-            $this->logError("$src is not readable");
-            return "MISSING RESOURCE $rsrc";
-        }
+       
+      }
     }
     if ( $attachment =~ /\.css$/i ) {
         $data =~ s/\burl\((["']?)(.*?)\1\)/$1.$this->_processURL($2).$1/ge;
