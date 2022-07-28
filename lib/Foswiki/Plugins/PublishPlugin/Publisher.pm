@@ -270,8 +270,6 @@ sub _loadParams {
             $k       = $spec->{renamed};
             $spec    = $schema{$k};
             $renamed = 1;
-
-            #print STDERR "Rename $ok to $k\n";
         }
 
         next if defined $opt{$k};
@@ -279,8 +277,6 @@ sub _loadParams {
         ASSERT( defined $spec->{validator}, $k ) if DEBUG;
 
         if ( !defined $v && defined $spec->{default} && !$renamed ) {
-
-            #print STDERR "Default $ok to '$spec->{default}'\n";
             $v = $spec->{default};
         }
         elsif ( defined $v ) {
@@ -603,8 +599,9 @@ TEXT
     $this->{archive}->getReady();
 
     # Force static context for all published topics
+    # Chaned to pdf only. Item15056
     Foswiki::Func::getContext()->{static} = 1
-       if  $this->{opt}->{format} eq 'pdf';
+      if $this->{opt}->{format} eq 'pdf';
 
     my $safe = $Foswiki::cfg{ScriptUrlPaths};
     undef $Foswiki::cfg{ScriptUrlPaths};
@@ -994,26 +991,41 @@ sub _rewriteTag {
         || $new =~ /^#/ )
     {
 
-        #$this->logDebug("Rewrite $new (rel to ",
-        #   $this->{archive}->getTopicPath( $web, $topic ).')');
+        $this->logDebug( "Rewrite $new (rel to ",
+            $this->{archive}->getTopicPath( $web, $topic ) . ')' );
         $new =
           File::Spec->abs2rel( "/$new",
             '/' . $this->{archive}->getTopicPath( $web, $topic ) . "/.." );
 
-        #$this->logDebug("as $new");
+        $this->logDebug("as $new");
     }
 
-    #$this->logDebug("$attrs{$key} = $new");
+    $this->logDebug("$attrs{$key} = $new");
     $attrs{$key} = $new;
 
     return
       "<$type " . join( ' ', map { "$_=\"$attrs{$_}\"" } keys %attrs ) . '>';
 }
 
+sub _rewriteStyleURL {
+    my ( $url, $referrer ) = @_;
+
+    # $url is the <url> used in the style url( <...>url> ) reference
+    # $ reference is the file path from where the reference was found
+
+    $referrer =~ m!\A([^/]+)/([^/]+)/(.*/)?[^/]+\Z!;
+    $url = Foswiki::Func::getPubUrlPath( $1, $2, "$3$url" );
+    return $url;
+}
+
 # Rewrite a URL - be it internal or external. Internal URLs that point to
 # anything in pub, or to scripts, are always rewritten.
 sub _processURL {
     my ( $this, $url, $referrer ) = @_;
+
+    if ( $referrer =~ m/\Astyle:(.+)/ ) {
+        $url = _rewriteStyleURL( $url, $1 );
+    }
 
     $url = URI->new($url);
 
@@ -1057,7 +1069,7 @@ sub _processURL {
     sub _match {
         my ( $abs, $url, $match ) = @_;
 
-        $this->logDebug("Test $url against $match");
+        #$this->logDebug("Test $url against $match");
 
         # Some older parsers used to allow the scheme name to be present
         # in the relative URL if it was the same as the base URL
@@ -1066,53 +1078,59 @@ sub _processURL {
         if ( $match->can('scheme') && $match->scheme ) {
             if ( $url->can('scheme') ) {
                 unless ( _matchPart( $url->scheme, $match->scheme ) ) {
-                    $this->logDebug( "- scheme mismatch "
-                          . $url->scheme . " and "
-                          . $match->scheme );
+
+                    #$this->logDebug( "- scheme mismatch "
+                    #      . $url->scheme . " and "
+                    #      . $match->scheme );
                     return undef;
                 }
             }
             else {
-                $this->logDebug("- no scheme on url");
+                #$this->logDebug("- no scheme on url");
                 return undef;
             }
         }
         elsif ( $url->can('scheme') && $url->scheme ) {
-            $this->logDebug("- no scheme on match");
+
+            #$this->logDebug("- no scheme on match");
             return undef;
         }
 
         if ( $match->can('host') && $match->host ) {
             if ( $url->can('host') ) {
                 unless ( _matchPart( $url->host, $match->host ) ) {
-                    $this->logDebug("- host mismatch");
+
+                    #$this->logDebug("- host mismatch");
                     return undef;
                 }
             }
             else {
-                $this->logDebug("- no host on url");
+                #$this->logDebug("- no host on url");
                 return undef;
             }
         }
         elsif ( $url->can('host') && $url->host ) {
-            $this->logDebug("- no host on match");
+
+            #$this->logDebug("- no host on match");
             return undef;
         }
 
         if ( $match->can('port') && length( $match->port ) ) {
             if ( $url->can('port') ) {
                 unless ( _matchPart( $url->port, $match->port ) ) {
-                    $this->logDebug("- port mismatch");
+
+                    #$this->logDebug("- port mismatch");
                     return undef;
                 }
             }
             else {
-                $this->logDebug("- no port on url");
+                #$this->logDebug("- no port on url");
                 return undef;
             }
         }
         elsif ( $url->can('port') && length( $url->port ) ) {
-            $this->logDebug("- no port on match");
+
+            #$this->logDebug("- no port on match");
             return undef;
         }
 
@@ -1125,16 +1143,17 @@ sub _processURL {
                 || $mpath[0] eq 'SCRIPT' )
           )
         {
-            $this->logDebug("- trim $upath[0] match $mpath[0]");
+            #$this->logDebug("- trim $upath[0] match $mpath[0]");
             shift(@mpath);
             shift(@upath);
         }
         if ( $mpath[0] eq 'WEB' ) {
-            $this->logDebug( "- matched " . join( '/', @upath ) );
+
+            #$this->logDebug( "- matched " . join( '/', @upath ) );
             return \@upath;
         }
         else {
-            $this->logDebug("- no match at $mpath[0]");
+            #$this->logDebug("- no match at $mpath[0]");
             return undef;
         }
     }
@@ -1206,7 +1225,7 @@ sub _processURL {
     my $new = $url;
 
     # Is it a pub resource?
-    #Item15055: 
+    #Item15055:
     # Abandoning the retrieval of pub resources  with query as external
     # readAttachment supports versioned attachments.
     # other parameters must be handled by the pub resource
@@ -1215,20 +1234,22 @@ sub _processURL {
     if ( $type eq 'pub' ) {
         if ( $url->query() ) {
             my %query = $url->query_form();
-            
-            $attachment = $query{filename} ? delete $query{filename} : pop(@$upath);
+
+            $attachment =
+              $query{filename} ? delete $query{filename} : pop(@$upath);
             $rev = $query{rev} ? delete $query{rev} : undef();
             $url->query_form( \%query );
         }
-        else{
+        else {
             $attachment = pop(@$upath) if scalar(@$upath);
             $rev = undef();
         }
-        $topic      = pop(@$upath) if scalar(@$upath);
+        $topic = pop(@$upath) if scalar(@$upath);
         $web = join( '/', @$upath );
-        $new = $this->_processInternalResource( $web, $topic, $attachment, $rev );
-        $new = $new.'?'.$url->query() if $url->query();
- 
+        $new =
+          $this->_processInternalResource( $web, $topic, $attachment, $rev );
+        $new = $new . '?' . $url->query() if $url->query();
+
     }
     elsif ( $type eq 'script' ) {
 
@@ -1287,52 +1308,85 @@ sub _processInternalResource {
 
     my $data;
 
-    # See it it's an attachment
-    my $d1 = Foswiki::Func::webExists( $web );
-    my $d2 = Foswiki::Func::attachmentExists( $web, $topic, $attachment );
-#    if ( Foswiki::Func::attachmentExists( $web, $topic, $attachment ) ) {
-    if ( $d1 && $d2 ) {
-        $data = Foswiki::Func::readAttachment( $web, $topic, $attachment, $rev );
+    # See if it's an attachment
+    if (   Foswiki::Func::webExists($web)
+        && Foswiki::Func::attachmentExists( $web, $topic, $attachment ) )
+    {
+        $data =
+          Foswiki::Func::readAttachment( $web, $topic, $attachment, $rev );
     }
     else {
-        # an unusual attachment;
-        my @webTopic = split '/', $web.'/'.$topic;
-        my @web = ( );
-        foreach my $i ( 0 .. $#webTopic) {
-            if (Foswiki::Func::webExists( join( '/', @web, $webTopic[$i] ) ) ) {
-                push @web, shift @webTopic;
+
+        my @webTopic = split '/', $web . '/' . $topic;
+        if ( Foswiki::Func::webExists( $webTopic[0] ) ) {
+
+            # an unusual attachment like (like jquery plugins)
+            # (pub/)web/topic/subdirs.../attachment
+
+            my @web = ();
+            foreach my $i ( 0 .. $#webTopic ) {
+                if (
+                    Foswiki::Func::webExists(
+                        join( '/', @web, $webTopic[$i] )
+                    )
+                  )
+                {
+                    push @web, shift @webTopic;
+                }
+                else {
+                    last;
+                }
+            }
+            $web        = join '/', @web;
+            $topic      = shift @webTopic;
+            $attachment = join '/', @webTopic, $attachment;
+
+            eval {
+                $data =
+                  Foswiki::Func::readAttachment( $web, $topic, $attachment,
+                    $rev );
+            };
+            unless ($data) {
+                $this->logError("$web\.$topic:$attachment is not readable");
+                return "MISSING RESOURCE $rsrc";
+            }
+        }
+        else {
+            # an unusual attachment (like images created by ImageGaleryPlugin);
+            # (pub/)directories/file
+            my $pubDir = Foswiki::Func::getPubDir();
+            my $src    = "$pubDir/$rsrc";
+            if ( open( my $fh, '<', $src ) ) {
+                local $/;
+                binmode($fh);
+                $data = <$fh>;
+                close($fh);
             }
             else {
-                last;
+                $this->logError("$src is not readable");
+                return "MISSING RESOURCE $rsrc";
             }
         }
-        $web = join '/', @web;
-        $topic = shift @webTopic;
-        $attachment = join '/', @webTopic, $attachment;
-print STDERR "WEB: $web\nTOPIC: $topic\nATTACHMENT: $attachment\n";
-####        if ( Foswiki::Func::attachmentExists( $web, $topic, $attachment ) ) {
-        $data = Foswiki::Func::readAttachment( $web, $topic, $attachment, $rev );
- ###        }
-        unless( $data) {
-            $this->logError("$web\.$topic:$attachment is not readable");
-            return "MISSING RESOURCE $rsrc";
-        }
-        # Not an attachment - pull on our muddy boots and puddle
-        # around in directories - if they exist!
-      if (1 == 0) {
-        my $pubDir = Foswiki::Func::getPubDir();
-        my $src    = "$pubDir/$rsrc";
-        if ( open( my $fh, '<', $src ) ) {
-            local $/;
-            binmode($fh);
-            $data = <$fh>;
-            close($fh);
-        }
-       
-      }
     }
+
     if ( $attachment =~ /\.css$/i ) {
-        $data =~ s/\burl\((["']?)(.*?)\1\)/$1.$this->_processURL($2).$1/ge;
+
+# styles use url() RELATIVE to the location of the file that makes the reference.
+# _processURL will copy the resource to the correct location related to the target
+# the reference itself should not be changed.
+# SMELL
+# the last statement (reference not changed) is not true.
+# this works only for references like url(somefile.ext)
+# references like url(../someplace/somefile.ext) need to translate to:
+#      url(../someplace.attachment/somefile.ext)
+# could not make this work
+# for html this is handled in rewrteTag, specific to the html tag.
+# for css this won't happen. Left for another day
+
+        while ( $data =~ m/\burl\((["']?)(.*?)\1\)/g ) {
+            next if $2 =~ m!\A\s*data:!;    # nothing to copy!!
+            $this->_processURL( $2, 'style:' . $rsrc );
+        }
     }
     my $path =
       $this->{archive}->addAttachment( $web, $topic, $attachment, $data );

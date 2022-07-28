@@ -1,4 +1,4 @@
-%META:TOPICINFO{author="ProjectContributor" comment="" date="1638778587" format="1.1" reprev="1" version="1"}%
+%META:TOPICINFO{author="BramVanOosterhout" comment="" date="1658981746" format="1.1" reprev="5" version="5"}%
 ---+!! <nop>%TOPIC%
 *Generates a static view of a web, as HTML files on disc, or as a =PDF=, or as a =zip= or =tgz= archive file, or by uploading directly to an FTP server.*
 
@@ -554,6 +554,7 @@ apply.
 ---++ Change History
 
 %TABLE{columnwidths="10em" tablewidth="100%"}%
+|  3.6 (28 Jul 2022) | Foswikitask:Item15055: Publish jquery plugins as internal resource. Foswikitask:Item15056: Allow publication of dynamic html. Foswikitask:Item15161: Support simple url() function references in =.css=. |
 |  3.5 (07 Dec 2021) | Foswikitask:Item15050: Bug fix. Foswikitask:Item15051: Improve saved publishing history. Foswikitask:Item15052: Allow =cover= on =publishskin=. Foswikitask:Item15053: Improve publishing resources. |
 |  3.4 (30 Jan 2018) | Foswikitask:Item14611: flatdir generator, Foswikitask:Item14612: add support for handling external resources, Foswikitask:Item14613: Foswikitask:Item14613: improve format UI, Foswikitask:Item14513: add HTML to basic_publish skin Foswikitask:Item14614: support parameters passed to resource URLs |
 |  3.3 (26 Jan 2018) | Foswikitask:Item14540: correct internal resource resolution Foswikitask:Item14610: re-implement defaultpage |
@@ -601,7 +602,7 @@ GNU General Public License for more details, published at
 http://www.gnu.org/copyleft/gpl.html
 
 %META:FORM{name="PackageForm"}%
-%META:FIELD{name="Author" title="Author" value=""}%
+%META:FIELD{name="Author" title="Author" value="ProjectContributor"}%
 %META:FIELD{name="Version" title="Version" value="%25$VERSION%25"}%
 %META:FIELD{name="Release" title="Release" value="%25$RELEASE%25"}%
 %META:FIELD{name="Description" title="Description" value="%25$SHORTDESCRIPTION%25"}%
